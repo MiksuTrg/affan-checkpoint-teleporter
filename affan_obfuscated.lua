@@ -12,7 +12,7 @@ AFFAN_SECURITY.VERSION = "3.0"
 AFFAN_SECURITY.BUILD = "20260723"
 AFFAN_SECURITY.SIGNATURE = "AFFAN_OFFICIAL_BUILD"
 
-local function _k91n55gj()
+local function _1539ilkb()
     local HttpService = game:GetService("HttpService")
     
     local success, clientId = pcall(function()
@@ -39,7 +39,7 @@ local function _k91n55gj()
 end
 
 local AFFAN_AUTHORIZED = true  -- Force allow for testing
--- local AFFAN_AUTHORIZED = _k91n55gj()
+-- local AFFAN_AUTHORIZED = _1539ilkb()
 if not AFFAN_AUTHORIZED then
     warn("[AFFAN] Protection check failed")
     return
@@ -69,13 +69,29 @@ local state = {
 
 local UI = {}
 local allConnections = {}
+local waypointListConnections = {}
 
-local function _kwpogk77(conn)
+local function _2d3aifli(conn)
     table.insert(allConnections, conn)
     return conn
 end
 
-local function _f8x5yp8s()
+local function _5hiud9qe(conn)
+    table.insert(waypointListConnections, conn)
+    return conn
+end
+
+local function _egkh3zre()
+    for _, conn in ipairs(waypointListConnections) do
+        if conn and conn.Connected then
+            conn:Disconnect()
+        end
+    end
+    waypointListConnections = {}
+end
+
+local function _d7wiyt5z()
+    _egkh3zre()
     for _, conn in ipairs(allConnections) do
         if conn and conn.Connected then
             conn:Disconnect()
@@ -84,7 +100,7 @@ local function _f8x5yp8s()
     allConnections = {}
 end
 
-local function _6yyalb83()
+local function _raaw84ra()
     local char = player.Character
     if not char then return nil end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -93,7 +109,7 @@ local function _6yyalb83()
     return char, hrp, hum
 end
 
-local function _xwv3vlwk()
+local function _2ifh1azs()
     local cps = {}
     local seen = {}
     local workspace = game:GetService("Workspace")
@@ -150,8 +166,8 @@ local function _xwv3vlwk()
     return cps
 end
 
-local function _21m9gf5r(targetPos, offsetY)
-    local char, hrp, hum = _6yyalb83()
+local function _w5gzwzdy(targetPos, offsetY)
+    local char, hrp, hum = _raaw84ra()
     if not char or not hrp then return false end
     
     offsetY = offsetY or 3
@@ -179,7 +195,7 @@ local function _21m9gf5r(targetPos, offsetY)
     return true
 end
 
-local function _iwf5dxp5(cp)
+local function _c26icptt(cp)
     if not cp or not cp.Parent then return false end
     
     local targetPos
@@ -196,17 +212,17 @@ local function _iwf5dxp5(cp)
         targetPos = cp.Position
     end
     
-    return _21m9gf5r(targetPos)
+    return _w5gzwzdy(targetPos)
 end
 
-local function _z9ccghhg(text, color)
+local function _vuv2mewy(text, color)
     if UI.StatusLabel then
         UI.StatusLabel.Text = text
         UI.StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
     end
 end
 
-local function _p8jtq59t(current, total)
+local function _aoihbvya(current, total)
     if UI.ProgressLabel then
         UI.ProgressLabel.Text = string.format("Progress: %d/%d", current, total)
     end
@@ -216,7 +232,7 @@ local function _p8jtq59t(current, total)
     end
 end
 
-local function _k8ntlfpl(name, pos, rot)
+local function _58d7d2nm(name, pos, rot)
     local waypoint = {
         name = name or string.format("Waypoint %d", #state.waypoints + 1),
         pos = pos,
@@ -227,37 +243,37 @@ local function _k8ntlfpl(name, pos, rot)
     return waypoint
 end
 
-local function _woqcujhz()
-    local char, hrp, hum = _6yyalb83()
+local function _2jvq4sme()
+    local char, hrp, hum = _raaw84ra()
     if not char or not hrp then
-        _z9ccghhg("❌ No character", Color3.fromRGB(255, 100, 100))
+        _vuv2mewy("❌ No character", Color3.fromRGB(255, 100, 100))
         return nil
     end
     
     local cam = workspace.CurrentCamera
-    local wp = _k8ntlfpl(
+    local wp = _58d7d2nm(
         string.format("WP_%d", #state.waypoints + 1),
         hrp.Position,
         cam and cam.CFrame or hrp.CFrame
     )
     
-    _z9ccghhg(string.format("✅ Marked: %s", wp.name), Color3.fromRGB(80, 255, 120))
+    _vuv2mewy(string.format("✅ Marked: %s", wp.name), Color3.fromRGB(80, 255, 120))
     return wp
 end
 
-local function _a9ho67vj(index)
+local function _f0a1l4ou(index)
     if index > 0 and index <= #state.waypoints then
         local wp = state.waypoints[index]
         table.remove(state.waypoints, index)
-        _z9ccghhg(string.format("🗑 Deleted: %s", wp.name), Color3.fromRGB(200, 100, 100))
+        _vuv2mewy(string.format("🗑 Deleted: %s", wp.name), Color3.fromRGB(200, 100, 100))
         return true
     end
     return false
 end
 
-local function _obojj63g(filename)
+local function _9qx0g53j(filename)
     if not writefile then
-        _z9ccghhg("❌ writefile unavailable", Color3.fromRGB(255, 100, 100))
+        _vuv2mewy("❌ writefile unavailable", Color3.fromRGB(255, 100, 100))
         return false
     end
     
@@ -286,13 +302,13 @@ local function _obojj63g(filename)
         writefile(path, json)
     end)
     
-    _z9ccghhg(string.format("💾 Saved: %s", filename), Color3.fromRGB(80, 255, 120))
+    _vuv2mewy(string.format("💾 Saved: %s", filename), Color3.fromRGB(80, 255, 120))
     return true
 end
 
-local function _7eist7t7(filename)
+local function _iw507sun(filename)
     if not readfile then
-        _z9ccghhg("❌ readfile unavailable", Color3.fromRGB(255, 100, 100))
+        _vuv2mewy("❌ readfile unavailable", Color3.fromRGB(255, 100, 100))
         return false
     end
     
@@ -303,7 +319,7 @@ local function _7eist7t7(filename)
     end)
     
     if not success then
-        _z9ccghhg("❌ File not found", Color3.fromRGB(255, 100, 100))
+        _vuv2mewy("❌ File not found", Color3.fromRGB(255, 100, 100))
         return false
     end
     
@@ -316,14 +332,14 @@ local function _7eist7t7(filename)
         if wp.rot and #wp.rot == 12 then
             rot = CFrame.new(unpack(wp.rot))
         end
-        _k8ntlfpl(wp.name, pos, rot)
+        _58d7d2nm(wp.name, pos, rot)
     end
     
-    _z9ccghhg(string.format("📂 Loaded: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    _vuv2mewy(string.format("📂 Loaded: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
     return true
 end
 
-local function _3wqnta9e()
+local function _0ddahctl()
     if not listfiles then return {} end
     
     local files = {}
@@ -341,30 +357,30 @@ local function _3wqnta9e()
     return files
 end
 
-local function _wgtlmir9()
+local function _1q06i8d6()
     if state.running then return end
     
     local items = state.currentMode == "checkpoint" and state.checkpoints or state.waypoints
     
     if #items == 0 then
-        _z9ccghhg("⚠ No items", Color3.fromRGB(255, 200, 50))
+        _vuv2mewy("⚠ No items", Color3.fromRGB(255, 200, 50))
         return
     end
     
     state.running = true
     state.paused = false
     state.currentIndex = 1
-    _z9ccghhg("🚀 Teleporting...", Color3.fromRGB(80, 255, 120))
-    _p8jtq59t(0, #items)
+    _vuv2mewy("🚀 Teleporting...", Color3.fromRGB(80, 255, 120))
+    _aoihbvya(0, #items)
     
     task.spawn(function()
         while state.running do
             if not state.paused then
-                local char, hrp, hum = _6yyalb83()
+                local char, hrp, hum = _raaw84ra()
                 if not char or not hrp or not hum then
                     state.running = false
                     state.paused = false
-                    _z9ccghhg("❌ Character invalid", Color3.fromRGB(255, 100, 100))
+                    _vuv2mewy("❌ Character invalid", Color3.fromRGB(255, 100, 100))
                     if UI.StartBtn then
                         UI.StartBtn.Text = "▶ START"
                         UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
@@ -376,28 +392,28 @@ local function _wgtlmir9()
                 local success = false
                 
                 if state.currentMode == "checkpoint" then
-                    success = _iwf5dxp5(item)
+                    success = _c26icptt(item)
                 else
                     if item and item.pos then
-                        success = _21m9gf5r(item.pos)
+                        success = _w5gzwzdy(item.pos)
                     end
                 end
                 
                 if success then
-                    _p8jtq59t(state.currentIndex, #items)
+                    _aoihbvya(state.currentIndex, #items)
                     state.currentIndex = state.currentIndex + 1
                     
                     if state.currentIndex > #items then
                         if state.loopEnabled then
-                            _z9ccghhg("🔄 Loop restart", Color3.fromRGB(100, 150, 255))
+                            _vuv2mewy("🔄 Loop restart", Color3.fromRGB(100, 150, 255))
                             state.currentIndex = 1
-                            _p8jtq59t(0, #items)
+                            _aoihbvya(0, #items)
                             task.wait(state.delayBetweenTP * 2)
                         else
                             state.running = false
                             state.paused = false
-                            _z9ccghhg("✅ Complete!", Color3.fromRGB(80, 255, 120))
-                            _p8jtq59t(#items, #items)
+                            _vuv2mewy("✅ Complete!", Color3.fromRGB(80, 255, 120))
+                            _aoihbvya(#items, #items)
                             if UI.StartBtn then
                                 UI.StartBtn.Text = "▶ START"
                                 UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
@@ -410,7 +426,7 @@ local function _wgtlmir9()
                 else
                     state.running = false
                     state.paused = false
-                    _z9ccghhg("❌ TP failed", Color3.fromRGB(255, 100, 100))
+                    _vuv2mewy("❌ TP failed", Color3.fromRGB(255, 100, 100))
                     if UI.StartBtn then
                         UI.StartBtn.Text = "▶ START"
                         UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
@@ -424,10 +440,10 @@ local function _wgtlmir9()
     end)
 end
 
-local function _p0i3w7we()
+local function _s5bqg7bb()
     state.running = false
     state.paused = false
-    _z9ccghhg("⏹ Stopped", Color3.fromRGB(150, 150, 150))
+    _vuv2mewy("⏹ Stopped", Color3.fromRGB(150, 150, 150))
     
     if UI.StartBtn then
         UI.StartBtn.Text = "▶ START"
@@ -438,8 +454,10 @@ local function _p0i3w7we()
     end
 end
 
-local function _ip0fwjgq()
+local function _1d6qosui()
     if not UI.WaypointList then return end
+    
+    _egkh3zre()
     
     for _, child in ipairs(UI.WaypointList:GetChildren()) do
         if child:IsA("Frame") then
@@ -486,9 +504,9 @@ local function _ip0fwjgq()
         TPBtnCorner.CornerRadius = UDim.new(0, 4)
         TPBtnCorner.Parent = TPBtn
         
-        _kwpogk77(TPBtn.MouseButton1Click:Connect(function()
-            _21m9gf5r(wp.pos)
-            _z9ccghhg(string.format("🚀 TP: %s", wp.name), Color3.fromRGB(80, 255, 120))
+        _5hiud9qe(TPBtn.MouseButton1Click:Connect(function()
+            _w5gzwzdy(wp.pos)
+            _vuv2mewy(string.format("🚀 TP: %s", wp.name), Color3.fromRGB(80, 255, 120))
         end))
         
         local DelBtn = Instance.new("TextButton")
@@ -506,9 +524,9 @@ local function _ip0fwjgq()
         DelBtnCorner.CornerRadius = UDim.new(0, 4)
         DelBtnCorner.Parent = DelBtn
         
-        _kwpogk77(DelBtn.MouseButton1Click:Connect(function()
-            _a9ho67vj(i)
-            _ip0fwjgq()
+        _5hiud9qe(DelBtn.MouseButton1Click:Connect(function()
+            _f0a1l4ou(i)
+            _1d6qosui()
             if UI.WaypointListLabel then
                 UI.WaypointListLabel.Text = string.format("🎯 Waypoints (%d)", #state.waypoints)
             end
@@ -522,7 +540,7 @@ local function _ip0fwjgq()
     end
 end
 
-local function _0chhcxm9()
+local function _5ju8b40i()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "AffanWaypointTP"
     ScreenGui.ResetOnSpawn = false
@@ -607,38 +625,40 @@ local function _0chhcxm9()
     CloseCorner.CornerRadius = UDim.new(0, 6)
     CloseCorner.Parent = CloseBtn
     
-    _kwpogk77(MinBtn.MouseButton1Click:Connect(function()
+    _2d3aifli(MinBtn.MouseButton1Click:Connect(function()
         state.minimized = not state.minimized
         if state.minimized then
             Main.Size = UDim2.new(0, 200, 0, 32)
-            LeftPanel.Visible = false
-            CenterPanel.Visible = false
-            RightPanel.Visible = false
-            Version.Visible = false
+            UI.LeftPanel.Visible = false
+            UI.CenterPanel.Visible = false
+            UI.RightPanel.Visible = false
+            UI.Version.Visible = false
             MinBtn.Text = "□"
         else
             Main.Size = UDim2.new(0, 650, 0, 280)
-            LeftPanel.Visible = true
-            CenterPanel.Visible = true
-            RightPanel.Visible = true
-            Version.Visible = true
+            UI.LeftPanel.Visible = true
+            UI.CenterPanel.Visible = true
+            UI.RightPanel.Visible = true
+            UI.Version.Visible = true
             MinBtn.Text = "_"
         end
     end))
     
-    _kwpogk77(CloseBtn.MouseButton1Click:Connect(function()
-        _p0i3w7we()
-        _f8x5yp8s()
+    _2d3aifli(CloseBtn.MouseButton1Click:Connect(function()
+        _s5bqg7bb()
+        _d7wiyt5z()
         ScreenGui:Destroy()
     end))
     
     local LeftPanel = Instance.new("Frame")
+    LeftPanel.Name = "LeftPanel"
     LeftPanel.Size = UDim2.new(0, 200, 1, -40)
     LeftPanel.Position = UDim2.new(0, 8, 0, 36)
     LeftPanel.BackgroundTransparency = 1
     LeftPanel.Parent = Main
+    UI.LeftPanel = LeftPanel
     
-    local function _57ws0vk9(text, yPos, color, callback, parent)
+    local function _luqsf8v9(text, yPos, color, callback, parent)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, 0, 0, 28)
         btn.Position = UDim2.new(0, 0, 0, yPos)
@@ -700,7 +720,7 @@ local function _0chhcxm9()
     ModeCorner.CornerRadius = UDim.new(0, 6)
     ModeCorner.Parent = ModeToggle
     
-    _kwpogk77(ModeToggle.MouseButton1Click:Connect(function()
+    _2d3aifli(ModeToggle.MouseButton1Click:Connect(function()
         state.currentMode = state.currentMode == "checkpoint" and "waypoint" or "checkpoint"
         if state.currentMode == "checkpoint" then
             ModeToggle.Text = "📍 Checkpoint"
@@ -711,53 +731,53 @@ local function _0chhcxm9()
         end
     end))
     
-    _57ws0vk9("🔍 SCAN", 52, Color3.fromRGB(60, 120, 200), function()
-        state.checkpoints = _xwv3vlwk()
+    _luqsf8v9("🔍 SCAN", 52, Color3.fromRGB(60, 120, 200), function()
+        state.checkpoints = _2ifh1azs()
         if #state.checkpoints > 0 then
-            _z9ccghhg(string.format("✅ %d CPs", #state.checkpoints), Color3.fromRGB(80, 255, 120))
-            _p8jtq59t(0, #state.checkpoints)
+            _vuv2mewy(string.format("✅ %d CPs", #state.checkpoints), Color3.fromRGB(80, 255, 120))
+            _aoihbvya(0, #state.checkpoints)
         else
-            _z9ccghhg("⚠ No checkpoints", Color3.fromRGB(255, 200, 50))
+            _vuv2mewy("⚠ No checkpoints", Color3.fromRGB(255, 200, 50))
         end
     end)
     
-    _57ws0vk9("📌 MARK", 85, Color3.fromRGB(180, 100, 200), function()
-        _woqcujhz()
-        _ip0fwjgq()
+    _luqsf8v9("📌 MARK", 85, Color3.fromRGB(180, 100, 200), function()
+        _2jvq4sme()
+        _1d6qosui()
     end)
     
-    _57ws0vk9("💾 SAVE", 118, Color3.fromRGB(0, 150, 80), function()
+    _luqsf8v9("💾 SAVE", 118, Color3.fromRGB(0, 150, 80), function()
         if #state.waypoints == 0 then
-            _z9ccghhg("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
+            _vuv2mewy("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
             return
         end
         local filename = "wp_" .. os.date("%m%d_%H%M")
-        _obojj63g(filename)
+        _9qx0g53j(filename)
         if UI.FileLabel then
             UI.FileLabel.Text = filename
         end
     end)
     
-    _57ws0vk9("📂 LOAD", 151, Color3.fromRGB(200, 140, 0), function()
-        local files = _3wqnta9e()
+    _luqsf8v9("📂 LOAD", 151, Color3.fromRGB(200, 140, 0), function()
+        local files = _0ddahctl()
         if #files == 0 then
-            _z9ccghhg("⚠ No files", Color3.fromRGB(255, 200, 50))
+            _vuv2mewy("⚠ No files", Color3.fromRGB(255, 200, 50))
             return
         end
         local filename = state.selectedFile or files[1]
-        if _7eist7t7(filename) then
-            _ip0fwjgq()
+        if _iw507sun(filename) then
+            _1d6qosui()
             if UI.FileLabel then
                 UI.FileLabel.Text = filename
             end
         end
     end)
     
-    local StartBtn = _57ws0vk9("▶ START", 184, Color3.fromRGB(0, 180, 80), function()
+    local StartBtn = _luqsf8v9("▶ START", 184, Color3.fromRGB(0, 180, 80), function()
         if state.running then
-            _p0i3w7we()
+            _s5bqg7bb()
         else
-            _wgtlmir9()
+            _1q06i8d6()
             StartBtn.Text = "⏹ STOP"
             StartBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
         end
@@ -790,7 +810,7 @@ local function _0chhcxm9()
     LoopCorner.CornerRadius = UDim.new(0, 4)
     LoopCorner.Parent = LoopToggle
     
-    _kwpogk77(LoopToggle.MouseButton1Click:Connect(function()
+    _2d3aifli(LoopToggle.MouseButton1Click:Connect(function()
         state.loopEnabled = not state.loopEnabled
         LoopToggle.Text = state.loopEnabled and "ON" or "OFF"
         LoopToggle.BackgroundColor3 = state.loopEnabled 
@@ -799,10 +819,12 @@ local function _0chhcxm9()
     end))
     
     local CenterPanel = Instance.new("Frame")
+    CenterPanel.Name = "CenterPanel"
     CenterPanel.Size = UDim2.new(0, 220, 1, -40)
     CenterPanel.Position = UDim2.new(0, 216, 0, 36)
     CenterPanel.BackgroundTransparency = 1
     CenterPanel.Parent = Main
+    UI.CenterPanel = CenterPanel
     
     local StatusLabel = Instance.new("TextLabel")
     StatusLabel.Size = UDim2.new(1, 0, 0, 18)
@@ -917,21 +939,25 @@ local function _0chhcxm9()
     
     local dragging = false
     
-    _kwpogk77(SliderBG.InputBegan:Connect(function(input)
+    _2d3aifli(SliderBG.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
+            Main.Draggable = false
         end
     end))
     
-    _kwpogk77(UserInputService.InputEnded:Connect(function(input)
+    _2d3aifli(UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
+            if dragging then
+                dragging = false
+                Main.Draggable = true
+            end
         end
     end))
     
-    _kwpogk77(UserInputService.InputChanged:Connect(function(input)
+    _2d3aifli(UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
                         input.UserInputType == Enum.UserInputType.Touch) then
             local pos = math.clamp(
@@ -948,10 +974,12 @@ local function _0chhcxm9()
     end))
     
     local RightPanel = Instance.new("Frame")
+    RightPanel.Name = "RightPanel"
     RightPanel.Size = UDim2.new(0, 206, 1, -40)
     RightPanel.Position = UDim2.new(1, -214, 0, 36)
     RightPanel.BackgroundTransparency = 1
     RightPanel.Parent = Main
+    UI.RightPanel = RightPanel
     
     local WaypointListLabel = Instance.new("TextLabel")
     WaypointListLabel.Size = UDim2.new(1, 0, 0, 16)
@@ -986,26 +1014,28 @@ local function _0chhcxm9()
     UI.WaypointList = WaypointList
     
     local Version = Instance.new("TextLabel")
+    Version.Name = "Version"
     Version.Size = UDim2.new(1, -16, 0, 12)
     Version.Position = UDim2.new(0, 8, 1, -16)
     Version.BackgroundTransparency = 1
-    Version.Text = "AFFAN v3.1 Mobile"
+    Version.Text = "AFFAN v3.3 Mobile"
     Version.TextColor3 = Color3.fromRGB(100, 100, 100)
     Version.Font = Enum.Font.Gotham
     Version.TextSize = 8
     Version.TextXAlignment = Enum.TextXAlignment.Center
     Version.Parent = Main
+    UI.Version = Version
     
     return ScreenGui
 end
 
-local gui = _0chhcxm9()
-_z9ccghhg("● Idle", Color3.fromRGB(150, 150, 150))
+local gui = _5ju8b40i()
+_vuv2mewy("● Idle", Color3.fromRGB(150, 150, 150))
 
-_kwpogk77(player.CharacterAdded:Connect(function()
-    _p0i3w7we()
+_2d3aifli(player.CharacterAdded:Connect(function()
+    _s5bqg7bb()
     task.wait(0.5)
-    _z9ccghhg("● Character respawned", Color3.fromRGB(200, 200, 80))
+    _vuv2mewy("● Character respawned", Color3.fromRGB(200, 200, 80))
 end))
 
 pcall(function()
