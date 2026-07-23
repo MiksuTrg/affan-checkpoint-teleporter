@@ -108,12 +108,15 @@ local function teleportToCP(cp)
     -- Teleport slightly above
     hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
     
-    -- Reset velocity
-    if hrp:FindFirstChild("AssemblyLinearVelocity") then
+    -- Reset velocity (new API first, fallback to old)
+    pcall(function()
         hrp.AssemblyLinearVelocity = Vector3.zero
-    end
-    hrp.Velocity = Vector3.zero
-    hrp.RotVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end)
+    pcall(function()
+        hrp.Velocity = Vector3.zero
+        hrp.RotVelocity = Vector3.zero
+    end)
     
     return true
 end
@@ -151,6 +154,18 @@ local function startTeleporting()
     task.spawn(function()
         while state.running do
             if not state.paused then
+                -- Check character still valid
+                local char, hrp, hum = getCharacter()
+                if not char or not hrp or not hum or hum.Health <= 0 then
+                    state.running = false
+                    updateStatus("❌ Character died/invalid", Color3.fromRGB(255, 100, 100))
+                    if UI.StartBtn then
+                        UI.StartBtn.Text = "▶ START TELEPORT"
+                        UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+                    end
+                    break
+                end
+                
                 local cp = state.checkpoints[state.currentIndex]
                 
                 if cp and cp.Parent then
@@ -171,6 +186,11 @@ local function startTeleporting()
                                 state.running = false
                                 updateStatus("✅ Summit reached!", Color3.fromRGB(80, 255, 120))
                                 updateProgress(#state.checkpoints, #state.checkpoints)
+                                -- Reset button UI
+                                if UI.StartBtn then
+                                    UI.StartBtn.Text = "▶ START TELEPORT"
+                                    UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+                                end
                                 break
                             end
                         else
@@ -187,7 +207,6 @@ local function startTeleporting()
                     break
                 end
             else
-                updateStatus("⏸ Paused", Color3.fromRGB(255, 200, 80))
                 task.wait(0.1)
             end
         end
@@ -198,10 +217,23 @@ local function stopTeleporting()
     state.running = false
     state.paused = false
     updateStatus("⏹ Stopped", Color3.fromRGB(150, 150, 150))
+    
+    -- Reset UI button states
+    if UI.StartBtn then
+        UI.StartBtn.Text = "▶ START TELEPORT"
+        UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+    end
+    if UI.PauseBtn then
+        UI.PauseBtn.Text = "⏸ PAUSE"
+    end
 end
 
 -- Create UI
 local function createUI()
+    -- Declare cleanup connections at top scope
+    local inputEndedConn
+    local inputChangedConn
+    
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "AffanCheckpointTP"
     ScreenGui.ResetOnSpawn = false
@@ -277,6 +309,11 @@ local function createUI()
     
     CloseBtn.MouseButton1Click:Connect(function()
         stopTeleporting()
+        
+        -- Cleanup connections
+        if inputEndedConn then inputEndedConn:Disconnect() end
+        if inputChangedConn then inputChangedConn:Disconnect() end
+        
         ScreenGui:Destroy()
     end)
     
@@ -468,7 +505,8 @@ local function createUI()
     
     -- Delay Slider Fill
     local SliderFill = Instance.new("Frame")
-    SliderFill.Size = UDim2.new(0.15, 0, 1, 0)
+    local initialPos = (state.delayBetweenTP - 0.1) / 2.9
+    SliderFill.Size = UDim2.new(initialPos, 0, 1, 0)
     SliderFill.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
     SliderFill.BorderSizePixel = 0
     SliderFill.Parent = SliderBG
@@ -480,7 +518,7 @@ local function createUI()
     -- Slider Knob
     local SliderKnob = Instance.new("Frame")
     SliderKnob.Size = UDim2.new(0, 16, 0, 16)
-    SliderKnob.Position = UDim2.new(0.15, -8, 0.5, -8)
+    SliderKnob.Position = UDim2.new(initialPos, -8, 0.5, -8)
     SliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     SliderKnob.BorderSizePixel = 0
     SliderKnob.Parent = SliderBG
@@ -490,19 +528,20 @@ local function createUI()
     SliderKnobCorner.Parent = SliderKnob
     
     local dragging = false
+    
     SliderBG.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
         end
     end)
     
-    game:GetService("UserInputService").InputEnded:Connect(function(input)
+    inputEndedConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
         end
     end)
     
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
+    inputChangedConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local pos = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
             local delay = 0.1 + (pos * 2.9)
