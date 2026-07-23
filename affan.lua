@@ -278,6 +278,82 @@ local function deleteWaypoint(index)
     return false
 end
 
+local function exportToClipboard()
+    if #state.waypoints == 0 then
+        updateStatus("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
+        return false
+    end
+    
+    local data = {
+        version = "3.3",
+        waypoints = {},
+        savedAt = os.time(),
+        mapName = workspace.Name or "Unknown",
+    }
+    
+    for _, wp in ipairs(state.waypoints) do
+        table.insert(data.waypoints, {
+            name = wp.name,
+            pos = {wp.pos.X, wp.pos.Y, wp.pos.Z},
+            rot = wp.rot and {
+                wp.rot:GetComponents()
+            } or nil,
+            timestamp = wp.timestamp,
+        })
+    end
+    
+    local json = HttpService:JSONEncode(data)
+    
+    if setclipboard then
+        pcall(function()
+            setclipboard(json)
+            updateStatus(string.format("📤 Copied: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+        end)
+    else
+        updateStatus("❌ Clipboard unavailable", Color3.fromRGB(255, 100, 100))
+    end
+    
+    return json
+end
+
+local function importFromClipboard()
+    if not getclipboard then
+        updateStatus("❌ Clipboard unavailable", Color3.fromRGB(255, 100, 100))
+        return false
+    end
+    
+    local success, json = pcall(function()
+        return getclipboard()
+    end)
+    
+    if not success or not json or json == "" then
+        updateStatus("❌ Clipboard empty", Color3.fromRGB(255, 100, 100))
+        return false
+    end
+    
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(json)
+    end)
+    
+    if not ok or not data.waypoints then
+        updateStatus("❌ Invalid format", Color3.fromRGB(255, 100, 100))
+        return false
+    end
+    
+    state.waypoints = {}
+    for _, wp in ipairs(data.waypoints or {}) do
+        local pos = Vector3.new(wp.pos[1], wp.pos[2], wp.pos[3])
+        local rot = nil
+        if wp.rot and #wp.rot == 12 then
+            rot = CFrame.new(unpack(wp.rot))
+        end
+        addWaypoint(wp.name, pos, rot)
+    end
+    
+    updateStatus(string.format("📥 Imported: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    return true
+end
+
 local function saveWaypointsToFile(filename)
     if not writefile then
         updateStatus("❌ writefile unavailable", Color3.fromRGB(255, 100, 100))
@@ -789,7 +865,48 @@ local function createUI()
         end
     end)
     
-    local StartBtn = createBtn("▶ START", 184, Color3.fromRGB(0, 180, 80), function()
+    -- Export/Import Row (compact, side by side)
+    local ExportBtn = Instance.new("TextButton")
+    ExportBtn.Size = UDim2.new(0.48, 0, 0, 28)
+    ExportBtn.Position = UDim2.new(0, 0, 0, 184)
+    ExportBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 200)
+    ExportBtn.BorderSizePixel = 0
+    ExportBtn.Text = "📤 EXPORT"
+    ExportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ExportBtn.Font = Enum.Font.GothamBold
+    ExportBtn.TextSize = 10
+    ExportBtn.Parent = LeftPanel
+    
+    local ExportBtnCorner = Instance.new("UICorner")
+    ExportBtnCorner.CornerRadius = UDim.new(0, 6)
+    ExportBtnCorner.Parent = ExportBtn
+    
+    addConnection(ExportBtn.MouseButton1Click:Connect(function()
+        exportToClipboard()
+    end))
+    
+    local ImportBtn = Instance.new("TextButton")
+    ImportBtn.Size = UDim2.new(0.48, 0, 0, 28)
+    ImportBtn.Position = UDim2.new(0.52, 0, 0, 184)
+    ImportBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 200)
+    ImportBtn.BorderSizePixel = 0
+    ImportBtn.Text = "📥 IMPORT"
+    ImportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ImportBtn.Font = Enum.Font.GothamBold
+    ImportBtn.TextSize = 10
+    ImportBtn.Parent = LeftPanel
+    
+    local ImportBtnCorner = Instance.new("UICorner")
+    ImportBtnCorner.CornerRadius = UDim.new(0, 6)
+    ImportBtnCorner.Parent = ImportBtn
+    
+    addConnection(ImportBtn.MouseButton1Click:Connect(function()
+        if importFromClipboard() then
+            refreshWaypointList()
+        end
+    end))
+    
+    local StartBtn = createBtn("▶ START", 217, Color3.fromRGB(0, 180, 80), function()
         if state.running then
             stopTeleporting()
         else
@@ -803,7 +920,7 @@ local function createUI()
     -- Loop + Delay (compact)
     local LoopLabel = Instance.new("TextLabel")
     LoopLabel.Size = UDim2.new(0, 60, 0, 14)
-    LoopLabel.Position = UDim2.new(0, 0, 0, 218)
+    LoopLabel.Position = UDim2.new(0, 0, 0, 251)
     LoopLabel.BackgroundTransparency = 1
     LoopLabel.Text = "Loop"
     LoopLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -814,7 +931,7 @@ local function createUI()
     
     local LoopToggle = Instance.new("TextButton")
     LoopToggle.Size = UDim2.new(0, 50, 0, 20)
-    LoopToggle.Position = UDim2.new(1, -52, 0, 216)
+    LoopToggle.Position = UDim2.new(1, -52, 0, 249)
     LoopToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 70)
     LoopToggle.BorderSizePixel = 0
     LoopToggle.Text = "ON"
