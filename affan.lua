@@ -543,10 +543,11 @@ local function createUI()
         ScreenGui.Parent = player:WaitForChild("PlayerGui")
     end
     
+    -- COMPACT HORIZONTAL LAYOUT (650x280)
     local Main = Instance.new("Frame")
     Main.Name = "Main"
-    Main.Size = UDim2.new(0, 380, 0, 520)
-    Main.Position = UDim2.new(0.5, -190, 0.15, 0)
+    Main.Size = UDim2.new(0, 650, 0, 280)
+    Main.Position = UDim2.new(0.5, -325, 0.5, -140)
     Main.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     Main.BorderSizePixel = 0
     Main.Active = true
@@ -554,50 +555,52 @@ local function createUI()
     Main.Parent = ScreenGui
     
     local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 12)
+    MainCorner.CornerRadius = UDim.new(0, 8)
     MainCorner.Parent = Main
     
+    -- Title Bar (compact)
     local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 45)
+    TitleBar.Size = UDim2.new(1, 0, 0, 32)
     TitleBar.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = Main
     
     local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 12)
+    TitleCorner.CornerRadius = UDim.new(0, 8)
     TitleCorner.Parent = TitleBar
     
     local TitleFill = Instance.new("Frame")
-    TitleFill.Size = UDim2.new(1, 0, 0, 12)
-    TitleFill.Position = UDim2.new(0, 0, 1, -12)
+    TitleFill.Size = UDim2.new(1, 0, 0, 8)
+    TitleFill.Position = UDim2.new(0, 0, 1, -8)
     TitleFill.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
     TitleFill.BorderSizePixel = 0
     TitleFill.Parent = TitleBar
     
     local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -50, 1, 0)
-    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.Size = UDim2.new(1, -35, 1, 0)
+    Title.Position = UDim2.new(0, 10, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "🎯 AFFAN Waypoint System"
+    Title.Text = "🎯 AFFAN v3.0 - Mobile"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 16
+    Title.TextSize = 13
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TitleBar
     
+    -- Close Button (compact)
     local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 32, 0, 32)
-    CloseBtn.Position = UDim2.new(1, -38, 0, 7)
+    CloseBtn.Size = UDim2.new(0, 28, 0, 28)
+    CloseBtn.Position = UDim2.new(1, -30, 0, 2)
     CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     CloseBtn.BorderSizePixel = 0
     CloseBtn.Text = "✕"
     CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 16
+    CloseBtn.TextSize = 14
     CloseBtn.Parent = TitleBar
     
     local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 8)
+    CloseCorner.CornerRadius = UDim.new(0, 6)
     CloseCorner.Parent = CloseBtn
     
     CloseBtn.MouseButton1Click:Connect(function()
@@ -606,36 +609,213 @@ local function createUI()
         ScreenGui:Destroy()
     end)
     
+    -- LEFT COLUMN: Controls (200px width)
+    local LeftPanel = Instance.new("Frame")
+    LeftPanel.Size = UDim2.new(0, 200, 1, -40)
+    LeftPanel.Position = UDim2.new(0, 8, 0, 36)
+    LeftPanel.BackgroundTransparency = 1
+    LeftPanel.Parent = Main
+    
+    -- Compact button helper
+    local function createBtn(text, yPos, color, callback, parent)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 28)
+        btn.Position = UDim2.new(0, 0, 0, yPos)
+        btn.BackgroundColor3 = color
+        btn.BorderSizePixel = 0
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 11
+        btn.AutoButtonColor = false
+        btn.Parent = parent or LeftPanel
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = btn
+        
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.1), {
+                BackgroundColor3 = Color3.new(
+                    math.min(color.R + 0.08, 1),
+                    math.min(color.G + 0.08, 1),
+                    math.min(color.B + 0.08, 1)
+                )
+            }):Play()
+        end)
+        
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.1), {
+                BackgroundColor3 = color
+            }):Play()
+        end)
+        
+        btn.MouseButton1Click:Connect(callback)
+        return btn
+    end
+    
+    -- Mode Toggle
+    local ModeLabel = Instance.new("TextLabel")
+    ModeLabel.Size = UDim2.new(1, 0, 0, 16)
+    ModeLabel.BackgroundTransparency = 1
+    ModeLabel.Text = "Mode"
+    ModeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    ModeLabel.Font = Enum.Font.Gotham
+    ModeLabel.TextSize = 10
+    ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ModeLabel.Parent = LeftPanel
+    
+    local ModeToggle = Instance.new("TextButton")
+    ModeToggle.Size = UDim2.new(1, 0, 0, 28)
+    ModeToggle.Position = UDim2.new(0, 0, 0, 18)
+    ModeToggle.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+    ModeToggle.BorderSizePixel = 0
+    ModeToggle.Text = "📍 Checkpoint"
+    ModeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ModeToggle.Font = Enum.Font.GothamBold
+    ModeToggle.TextSize = 11
+    ModeToggle.Parent = LeftPanel
+    
+    local ModeCorner = Instance.new("UICorner")
+    ModeCorner.CornerRadius = UDim.new(0, 6)
+    ModeCorner.Parent = ModeToggle
+    
+    ModeToggle.MouseButton1Click:Connect(function()
+        state.currentMode = state.currentMode == "checkpoint" and "waypoint" or "checkpoint"
+        if state.currentMode == "checkpoint" then
+            ModeToggle.Text = "📍 Checkpoint"
+            ModeToggle.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        else
+            ModeToggle.Text = "🎯 Waypoint"
+            ModeToggle.BackgroundColor3 = Color3.fromRGB(200, 100, 180)
+        end
+    end)
+    
+    -- Action Buttons
+    createBtn("🔍 SCAN", 52, Color3.fromRGB(60, 120, 200), function()
+        state.checkpoints = scanCheckpoints()
+        if #state.checkpoints > 0 then
+            updateStatus(string.format("✅ %d CPs", #state.checkpoints), Color3.fromRGB(80, 255, 120))
+            updateProgress(0, #state.checkpoints)
+        else
+            updateStatus("⚠ No checkpoints", Color3.fromRGB(255, 200, 50))
+        end
+    end)
+    
+    createBtn("📌 MARK", 85, Color3.fromRGB(180, 100, 200), function()
+        markCurrentPosition()
+        refreshWaypointList()
+    end)
+    
+    createBtn("💾 SAVE", 118, Color3.fromRGB(0, 150, 80), function()
+        if #state.waypoints == 0 then
+            updateStatus("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
+            return
+        end
+        local filename = "wp_" .. os.date("%m%d_%H%M")
+        saveWaypointsToFile(filename)
+        if UI.FileLabel then
+            UI.FileLabel.Text = filename
+        end
+    end)
+    
+    createBtn("📂 LOAD", 151, Color3.fromRGB(200, 140, 0), function()
+        local files = listSavedFiles()
+        if #files == 0 then
+            updateStatus("⚠ No files", Color3.fromRGB(255, 200, 50))
+            return
+        end
+        local filename = state.selectedFile or files[1]
+        if loadWaypointsFromFile(filename) then
+            refreshWaypointList()
+            if UI.FileLabel then
+                UI.FileLabel.Text = filename
+            end
+        end
+    end)
+    
+    local StartBtn = createBtn("▶ START", 184, Color3.fromRGB(0, 180, 80), function()
+        if state.running then
+            stopTeleporting()
+        else
+            startTeleporting()
+            StartBtn.Text = "⏹ STOP"
+            StartBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+        end
+    end)
+    UI.StartBtn = StartBtn
+    
+    -- Loop + Delay (compact)
+    local LoopLabel = Instance.new("TextLabel")
+    LoopLabel.Size = UDim2.new(0, 60, 0, 14)
+    LoopLabel.Position = UDim2.new(0, 0, 0, 218)
+    LoopLabel.BackgroundTransparency = 1
+    LoopLabel.Text = "Loop"
+    LoopLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    LoopLabel.Font = Enum.Font.Gotham
+    LoopLabel.TextSize = 9
+    LoopLabel.TextXAlignment = Enum.TextXAlignment.Left
+    LoopLabel.Parent = LeftPanel
+    
+    local LoopToggle = Instance.new("TextButton")
+    LoopToggle.Size = UDim2.new(0, 50, 0, 20)
+    LoopToggle.Position = UDim2.new(1, -52, 0, 216)
+    LoopToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 70)
+    LoopToggle.BorderSizePixel = 0
+    LoopToggle.Text = "ON"
+    LoopToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    LoopToggle.Font = Enum.Font.GothamBold
+    LoopToggle.TextSize = 9
+    LoopToggle.Parent = LeftPanel
+    
+    local LoopCorner = Instance.new("UICorner")
+    LoopCorner.CornerRadius = UDim.new(0, 4)
+    LoopCorner.Parent = LoopToggle
+    
+    LoopToggle.MouseButton1Click:Connect(function()
+        state.loopEnabled = not state.loopEnabled
+        LoopToggle.Text = state.loopEnabled and "ON" or "OFF"
+        LoopToggle.BackgroundColor3 = state.loopEnabled 
+            and Color3.fromRGB(0, 150, 70) 
+            or Color3.fromRGB(60, 60, 70)
+    end)
+    
+    -- CENTER COLUMN: Status & Progress (220px)
+    local CenterPanel = Instance.new("Frame")
+    CenterPanel.Size = UDim2.new(0, 220, 1, -40)
+    CenterPanel.Position = UDim2.new(0, 216, 0, 36)
+    CenterPanel.BackgroundTransparency = 1
+    CenterPanel.Parent = Main
+    
     local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, -30, 0, 22)
-    StatusLabel.Position = UDim2.new(0, 15, 0, 55)
+    StatusLabel.Size = UDim2.new(1, 0, 0, 18)
     StatusLabel.BackgroundTransparency = 1
     StatusLabel.Text = "● Idle"
     StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 12
+    StatusLabel.TextSize = 10
     StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    StatusLabel.Parent = Main
+    StatusLabel.Parent = CenterPanel
     UI.StatusLabel = StatusLabel
     
     local ProgressLabel = Instance.new("TextLabel")
-    ProgressLabel.Size = UDim2.new(1, -30, 0, 18)
-    ProgressLabel.Position = UDim2.new(0, 15, 0, 80)
+    ProgressLabel.Size = UDim2.new(1, 0, 0, 16)
+    ProgressLabel.Position = UDim2.new(0, 0, 0, 22)
     ProgressLabel.BackgroundTransparency = 1
     ProgressLabel.Text = "Progress: 0/0"
     ProgressLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     ProgressLabel.Font = Enum.Font.Gotham
-    ProgressLabel.TextSize = 11
+    ProgressLabel.TextSize = 9
     ProgressLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ProgressLabel.Parent = Main
+    ProgressLabel.Parent = CenterPanel
     UI.ProgressLabel = ProgressLabel
     
     local ProgressBG = Instance.new("Frame")
-    ProgressBG.Size = UDim2.new(1, -30, 0, 6)
-    ProgressBG.Position = UDim2.new(0, 15, 0, 102)
+    ProgressBG.Size = UDim2.new(1, 0, 0, 6)
+    ProgressBG.Position = UDim2.new(0, 0, 0, 42)
     ProgressBG.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     ProgressBG.BorderSizePixel = 0
-    ProgressBG.Parent = Main
+    ProgressBG.Parent = CenterPanel
     
     local ProgressBGCorner = Instance.new("UICorner")
     ProgressBGCorner.CornerRadius = UDim.new(1, 0)
@@ -652,241 +832,47 @@ local function createUI()
     ProgressBarCorner.Parent = ProgressBar
     UI.ProgressBar = ProgressBar
     
-
-
-    local function createButton(text, yPos, color, callback)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.48, -2, 0, 38)
-        btn.Position = UDim2.new(0, 15, 0, yPos)
-        btn.BackgroundColor3 = color
-        btn.BorderSizePixel = 0
-        btn.Text = text
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 13
-        btn.AutoButtonColor = false
-        btn.Parent = Main
-        
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 8)
-        btnCorner.Parent = btn
-        
-        btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.12), {
-                BackgroundColor3 = Color3.new(
-                    math.min(color.R + 0.08, 1),
-                    math.min(color.G + 0.08, 1),
-                    math.min(color.B + 0.08, 1)
-                )
-            }):Play()
-        end)
-        
-        btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.12), {
-                BackgroundColor3 = color
-            }):Play()
-        end)
-        
-        btn.MouseButton1Click:Connect(callback)
-        return btn
-    end
-    
-    local function createButtonRight(text, yPos, color, callback)
-        local btn = createButton(text, yPos, color, callback)
-        btn.Position = UDim2.new(0.52, 2, 0, yPos)
-        return btn
-    end
-    
-    local ModeLabel = Instance.new("TextLabel")
-    ModeLabel.Size = UDim2.new(0, 80, 0, 18)
-    ModeLabel.Position = UDim2.new(0, 15, 0, 120)
-    ModeLabel.BackgroundTransparency = 1
-    ModeLabel.Text = "Mode:"
-    ModeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    ModeLabel.Font = Enum.Font.Gotham
-    ModeLabel.TextSize = 11
-    ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ModeLabel.Parent = Main
-    
-    local ModeToggle = Instance.new("TextButton")
-    ModeToggle.Size = UDim2.new(0, 110, 0, 26)
-    ModeToggle.Position = UDim2.new(0, 100, 0, 116)
-    ModeToggle.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
-    ModeToggle.BorderSizePixel = 0
-    ModeToggle.Text = "📍 Checkpoint"
-    ModeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ModeToggle.Font = Enum.Font.GothamBold
-    ModeToggle.TextSize = 11
-    ModeToggle.Parent = Main
-    
-    local ModeToggleCorner = Instance.new("UICorner")
-    ModeToggleCorner.CornerRadius = UDim.new(0, 6)
-    ModeToggleCorner.Parent = ModeToggle
-    
-    ModeToggle.MouseButton1Click:Connect(function()
-        state.currentMode = state.currentMode == "checkpoint" and "waypoint" or "checkpoint"
-        if state.currentMode == "checkpoint" then
-            ModeToggle.Text = "📍 Checkpoint"
-            ModeToggle.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
-        else
-            ModeToggle.Text = "🎯 Waypoint"
-            ModeToggle.BackgroundColor3 = Color3.fromRGB(200, 100, 180)
-        end
-        updateStatus(string.format("Mode: %s", state.currentMode), Color3.fromRGB(200, 200, 200))
-    end)
-    
-    createButton("🔍 SCAN", 150, Color3.fromRGB(60, 120, 200), function()
-        state.checkpoints = scanCheckpoints()
-        if #state.checkpoints > 0 then
-            updateStatus(string.format("✅ Found %d CPs", #state.checkpoints), Color3.fromRGB(80, 255, 120))
-            updateProgress(0, #state.checkpoints)
-        else
-            updateStatus("⚠ No checkpoints", Color3.fromRGB(255, 200, 50))
-        end
-    end)
-    
-    createButtonRight("📌 MARK", 150, Color3.fromRGB(180, 100, 200), function()
-        markCurrentPosition()
-        refreshWaypointList()
-    end)
-    
-    local SaveLoadLabel = Instance.new("TextLabel")
-    SaveLoadLabel.Size = UDim2.new(1, -30, 0, 18)
-    SaveLoadLabel.Position = UDim2.new(0, 15, 0, 198)
-    SaveLoadLabel.BackgroundTransparency = 1
-    SaveLoadLabel.Text = "💾 Save/Load Waypoints"
-    SaveLoadLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    SaveLoadLabel.Font = Enum.Font.GothamBold
-    SaveLoadLabel.TextSize = 12
-    SaveLoadLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SaveLoadLabel.Parent = Main
-    
+    -- File Label (compact)
     local FileLabel = Instance.new("TextLabel")
-    FileLabel.Size = UDim2.new(1, -30, 0, 28)
-    FileLabel.Position = UDim2.new(0, 15, 0, 220)
+    FileLabel.Size = UDim2.new(1, 0, 0, 24)
+    FileLabel.Position = UDim2.new(0, 0, 0, 56)
     FileLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     FileLabel.BorderSizePixel = 0
-    FileLabel.Text = "📁 Auto-named on save"
+    FileLabel.Text = "Auto-named"
     FileLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     FileLabel.Font = Enum.Font.Gotham
-    FileLabel.TextSize = 11
+    FileLabel.TextSize = 9
     FileLabel.TextXAlignment = Enum.TextXAlignment.Left
-    FileLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    FileLabel.Parent = Main
+    FileLabel.Parent = CenterPanel
     UI.FileLabel = FileLabel
     
     local FileLabelCorner = Instance.new("UICorner")
-    FileLabelCorner.CornerRadius = UDim.new(0, 6)
+    FileLabelCorner.CornerRadius = UDim.new(0, 4)
     FileLabelCorner.Parent = FileLabel
     
     local FileLabelPadding = Instance.new("UIPadding")
-    FileLabelPadding.PaddingLeft = UDim.new(0, 10)
+    FileLabelPadding.PaddingLeft = UDim.new(0, 6)
     FileLabelPadding.Parent = FileLabel
     
-    createButton("💾 SAVE", 255, Color3.fromRGB(0, 150, 80), function()
-        if #state.waypoints == 0 then
-            updateStatus("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
-            return
-        end
-        
-        local filename = "wp_" .. os.date("%m%d_%H%M")
-        saveWaypointsToFile(filename)
-        FileLabel.Text = "📁 " .. filename
-        state.selectedFile = filename
-    end)
-    
-    createButtonRight("📂 LOAD", 255, Color3.fromRGB(200, 140, 0), function()
-        local files = listSavedFiles()
-        if #files == 0 then
-            updateStatus("⚠ No saved files", Color3.fromRGB(255, 200, 50))
-            return
-        end
-        
-        local filename = state.selectedFile or files[1]
-        
-        if loadWaypointsFromFile(filename) then
-            refreshWaypointList()
-            FileLabel.Text = "📁 " .. filename
-        end
-    end)
-    
-    local StartBtn = createButton("▶ START", 295, Color3.fromRGB(0, 180, 80), function()
-        if state.running then
-            stopTeleporting()
-        else
-            startTeleporting()
-            StartBtn.Text = "⏹ STOP"
-            StartBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-        end
-    end)
-    UI.StartBtn = StartBtn
-    
-    local PauseBtn = createButtonRight("⏸ PAUSE", 295, Color3.fromRGB(200, 140, 0), function()
-        if state.running then
-            state.paused = not state.paused
-            if state.paused then
-                PauseBtn.Text = "▶ RESUME"
-                updateStatus("⏸ Paused", Color3.fromRGB(255, 200, 80))
-            else
-                PauseBtn.Text = "⏸ PAUSE"
-                updateStatus("🚀 Teleporting...", Color3.fromRGB(80, 255, 120))
-            end
-        end
-    end)
-    UI.PauseBtn = PauseBtn
-    
-    local LoopLabel = Instance.new("TextLabel")
-    LoopLabel.Size = UDim2.new(0, 120, 0, 18)
-    LoopLabel.Position = UDim2.new(0, 15, 0, 345)
-    LoopLabel.BackgroundTransparency = 1
-    LoopLabel.Text = "🔄 Loop Mode:"
-    LoopLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    LoopLabel.Font = Enum.Font.Gotham
-    LoopLabel.TextSize = 11
-    LoopLabel.TextXAlignment = Enum.TextXAlignment.Left
-    LoopLabel.Parent = Main
-    
-    local LoopToggle = Instance.new("TextButton")
-    LoopToggle.Size = UDim2.new(0, 70, 0, 26)
-    LoopToggle.Position = UDim2.new(1, -85, 0, 341)
-    LoopToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 70)
-    LoopToggle.BorderSizePixel = 0
-    LoopToggle.Text = "ON"
-    LoopToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    LoopToggle.Font = Enum.Font.GothamBold
-    LoopToggle.TextSize = 12
-    LoopToggle.Parent = Main
-    
-    local LoopToggleCorner = Instance.new("UICorner")
-    LoopToggleCorner.CornerRadius = UDim.new(0, 6)
-    LoopToggleCorner.Parent = LoopToggle
-    
-    LoopToggle.MouseButton1Click:Connect(function()
-        state.loopEnabled = not state.loopEnabled
-        LoopToggle.Text = state.loopEnabled and "ON" or "OFF"
-        LoopToggle.BackgroundColor3 = state.loopEnabled 
-            and Color3.fromRGB(0, 150, 70) 
-            or Color3.fromRGB(60, 60, 70)
-    end)
-    
+    -- Delay Slider (compact)
     local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(1, -30, 0, 18)
-    DelayLabel.Position = UDim2.new(0, 15, 0, 375)
+    DelayLabel.Size = UDim2.new(1, 0, 0, 16)
+    DelayLabel.Position = UDim2.new(0, 0, 0, 88)
     DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Text = string.format("⏱ Delay: %.1fs", state.delayBetweenTP)
+    DelayLabel.Text = string.format("⏱ %.1fs", state.delayBetweenTP)
     DelayLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 11
+    DelayLabel.TextSize = 9
     DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DelayLabel.Parent = Main
+    DelayLabel.Parent = CenterPanel
     UI.DelayLabel = DelayLabel
     
     local SliderBG = Instance.new("Frame")
-    SliderBG.Size = UDim2.new(1, -30, 0, 6)
-    SliderBG.Position = UDim2.new(0, 15, 0, 397)
+    SliderBG.Size = UDim2.new(1, 0, 0, 6)
+    SliderBG.Position = UDim2.new(0, 0, 0, 108)
     SliderBG.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     SliderBG.BorderSizePixel = 0
-    SliderBG.Parent = Main
+    SliderBG.Parent = CenterPanel
     
     local SliderBGCorner = Instance.new("UICorner")
     SliderBGCorner.CornerRadius = UDim.new(1, 0)
@@ -904,8 +890,8 @@ local function createUI()
     SliderFillCorner.Parent = SliderFill
     
     local SliderKnob = Instance.new("Frame")
-    SliderKnob.Size = UDim2.new(0, 14, 0, 14)
-    SliderKnob.Position = UDim2.new(initialPos, -7, 0.5, -7)
+    SliderKnob.Size = UDim2.new(0, 12, 0, 12)
+    SliderKnob.Position = UDim2.new(initialPos, -6, 0.5, -6)
     SliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     SliderKnob.BorderSizePixel = 0
     SliderKnob.Parent = SliderBG
@@ -917,19 +903,22 @@ local function createUI()
     local dragging = false
     
     SliderBG.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
         end
     end)
     
     addConnection(UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end))
     
     addConnection(UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
+                        input.UserInputType == Enum.UserInputType.Touch) then
             local pos = math.clamp(
                 (input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 
                 0, 1
@@ -938,57 +927,65 @@ local function createUI()
             state.delayBetweenTP = math.floor(delay * 10) / 10
             
             SliderFill.Size = UDim2.new(pos, 0, 1, 0)
-            SliderKnob.Position = UDim2.new(pos, -7, 0.5, -7)
-            DelayLabel.Text = string.format("⏱ Delay: %.1fs", state.delayBetweenTP)
+            SliderKnob.Position = UDim2.new(pos, -6, 0.5, -6)
+            DelayLabel.Text = string.format("⏱ %.1fs", state.delayBetweenTP)
         end
     end))
     
+    -- RIGHT COLUMN: Waypoint List (206px)
+    local RightPanel = Instance.new("Frame")
+    RightPanel.Size = UDim2.new(0, 206, 1, -40)
+    RightPanel.Position = UDim2.new(1, -214, 0, 36)
+    RightPanel.BackgroundTransparency = 1
+    RightPanel.Parent = Main
+    
     local WaypointListLabel = Instance.new("TextLabel")
-    WaypointListLabel.Size = UDim2.new(1, -30, 0, 18)
-    WaypointListLabel.Position = UDim2.new(0, 15, 0, 412)
+    WaypointListLabel.Size = UDim2.new(1, 0, 0, 16)
     WaypointListLabel.BackgroundTransparency = 1
     WaypointListLabel.Text = "🎯 Waypoints (0)"
     WaypointListLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     WaypointListLabel.Font = Enum.Font.GothamBold
-    WaypointListLabel.TextSize = 12
+    WaypointListLabel.TextSize = 10
     WaypointListLabel.TextXAlignment = Enum.TextXAlignment.Left
-    WaypointListLabel.Parent = Main
+    WaypointListLabel.Parent = RightPanel
     UI.WaypointListLabel = WaypointListLabel
     
     local WaypointListBG = Instance.new("Frame")
-    WaypointListBG.Size = UDim2.new(1, -30, 0, 60)
-    WaypointListBG.Position = UDim2.new(0, 15, 0, 435)
+    WaypointListBG.Size = UDim2.new(1, 0, 1, -20)
+    WaypointListBG.Position = UDim2.new(0, 0, 0, 20)
     WaypointListBG.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     WaypointListBG.BorderSizePixel = 0
-    WaypointListBG.Parent = Main
+    WaypointListBG.Parent = RightPanel
     
     local WaypointListBGCorner = Instance.new("UICorner")
-    WaypointListBGCorner.CornerRadius = UDim.new(0, 8)
+    WaypointListBGCorner.CornerRadius = UDim.new(0, 6)
     WaypointListBGCorner.Parent = WaypointListBG
     
     local WaypointList = Instance.new("ScrollingFrame")
     WaypointList.Size = UDim2.new(1, 0, 1, 0)
     WaypointList.BackgroundTransparency = 1
     WaypointList.BorderSizePixel = 0
-    WaypointList.ScrollBarThickness = 4
+    WaypointList.ScrollBarThickness = 3
     WaypointList.CanvasSize = UDim2.new(0, 0, 0, 0)
     WaypointList.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
     WaypointList.Parent = WaypointListBG
     UI.WaypointList = WaypointList
     
+    -- Version (compact, bottom)
     local Version = Instance.new("TextLabel")
-    Version.Size = UDim2.new(1, -30, 0, 16)
-    Version.Position = UDim2.new(0, 15, 1, -20)
+    Version.Size = UDim2.new(1, -16, 0, 12)
+    Version.Position = UDim2.new(0, 8, 1, -16)
     Version.BackgroundTransparency = 1
-    Version.Text = "AFFAN v3.0 | Waypoint System"
+    Version.Text = "AFFAN v3.1 Mobile"
     Version.TextColor3 = Color3.fromRGB(100, 100, 100)
     Version.Font = Enum.Font.Gotham
-    Version.TextSize = 9
+    Version.TextSize = 8
     Version.TextXAlignment = Enum.TextXAlignment.Center
     Version.Parent = Main
     
     return ScreenGui
 end
+
 
 local gui = createUI()
 updateStatus("● Idle", Color3.fromRGB(150, 150, 150))
