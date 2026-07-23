@@ -1,56 +1,74 @@
--- AFFAN Checkpoint Teleporter v2
--- Auto teleport ke setiap checkpoint sampai summit
--- No external dependencies - pure Roblox UI
+-- AFFAN Checkpoint & Waypoint Teleporter v3.0
+-- Custom waypoint marking + save/load + auto teleport
+-- Bug fixes: 10 issues from v2.0
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 
--- State
 local state = {
     running = false,
     paused = false,
     currentIndex = 1,
     checkpoints = {},
+    waypoints = {},
     loopEnabled = true,
     delayBetweenTP = 0.5,
+    currentMode = "checkpoint",
+    selectedFile = nil,
 }
 
--- UI references
 local UI = {}
+local allConnections = {}
 
--- Helper functions
+local function addConnection(conn)
+    table.insert(allConnections, conn)
+    return conn
+end
+
+local function cleanupAllConnections()
+    for _, conn in ipairs(allConnections) do
+        if conn and conn.Connected then
+            conn:Disconnect()
+        end
+    end
+    allConnections = {}
+end
+
 local function getCharacter()
     local char = player.Character
     if not char then return nil end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChild("Humanoid")
-    if not hrp or not hum then return nil end
+    if not hrp or not hum or hum.Health <= 0 then return nil end
     return char, hrp, hum
 end
 
--- Scan checkpoints
 local function scanCheckpoints()
     local cps = {}
     local seen = {}
     local workspace = game:GetService("Workspace")
     
-    -- Pattern 1: Folder "Checkpoints" / "Stages" / "Parts"
     local checkpointFolder = workspace:FindFirstChild("Checkpoints") 
         or workspace:FindFirstChild("Stages")
         or workspace:FindFirstChild("Parts")
     
     if checkpointFolder then
         for _, child in ipairs(checkpointFolder:GetChildren()) do
-            if (child:IsA("BasePart") or child:IsA("Model")) and not seen[child] then
-                table.insert(cps, child)
-                seen[child] = true
+            if (child:IsA("BasePart") or child:IsA("Model")) then
+                local pos = child:IsA("Model") and child:GetPivot().Position or child.Position
+                local key = string.format("%.1f_%.1f_%.1f", pos.X, pos.Y, pos.Z)
+                if not seen[key] then
+                    table.insert(cps, child)
+                    seen[key] = true
+                end
             end
         end
     else
-        -- Pattern 2: Scan part names
         local checked = 0
         local maxChecks = 5000
         
@@ -61,23 +79,24 @@ local function scanCheckpoints()
                 break
             end
             
-            if obj:IsA("BasePart") and not seen[obj] then
+            if obj:IsA("BasePart") then
                 local name = obj.Name:lower()
                 if name:match("checkpoint") or name:match("stage") or name:match("^%d+$") then
-                    table.insert(cps, obj)
-                    seen[obj] = true
+                    local pos = obj.Position
+                    local key = string.format("%.1f_%.1f_%.1f", pos.X, pos.Y, pos.Z)
+                    if not seen[key] then
+                        table.insert(cps, obj)
+                        seen[key] = true
+                    end
                 end
             end
         end
     end
     
-    -- Sort by number or Y position
     table.sort(cps, function(a, b)
         local aNum = tonumber(a.Name:match("%d+"))
         local bNum = tonumber(b.Name:match("%d+"))
-        if aNum and bNum then
-            return aNum < bNum
-        end
+        if aNum and bNum then return aNum < bNum end
         local aPos = a:IsA("Model") and a:GetPivot().Position or a.Position
         local bPos = b:IsA("Model") and b:GetPivot().Position or b.Position
         return aPos.Y < bPos.Y
@@ -86,29 +105,23 @@ local function scanCheckpoints()
     return cps
 end
 
--- Teleport to checkpoint
-local function teleportToCP(cp)
+local function teleportToPosition(targetPos, offsetY)
     local char, hrp, hum = getCharacter()
-    if not char or not hrp then 
-        return false
-    end
+    if not char or not hrp then return false end
     
-    if not cp or not cp.Parent then
-        warn("[AFFAN] Checkpoint not found")
-        return false
-    end
+    offsetY = offsetY or 3
     
-    local targetPos
-    if cp:IsA("Model") then
-        targetPos = cp:GetPivot().Position
-    else
-        targetPos = cp.Position
-    end
+    local rayOrigin = targetPos + Vector3.new(0, offsetY, 0)
+    local rayDirection = Vector3.new(0, 5, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {char}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     
-    -- Teleport slightly above
-    hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
+    local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    if rayResult then offsetY = math.min(offsetY, 2) end
     
-    -- Reset velocity (new API first, fallback to old)
+    hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, offsetY, 0))
+    
     pcall(function()
         hrp.AssemblyLinearVelocity = Vector3.zero
         hrp.AssemblyAngularVelocity = Vector3.zero
@@ -121,7 +134,26 @@ local function teleportToCP(cp)
     return true
 end
 
--- Update UI status
+local function teleportToCP(cp)
+    if not cp or not cp.Parent then return false end
+    
+    local targetPos
+    if cp:IsA("Model") then
+        local success, result = pcall(function() return cp:GetPivot() end)
+        if success and result then
+            targetPos = result.Position
+        else
+            local primary = cp.PrimaryPart or cp:FindFirstChildWhichIsA("BasePart")
+            if not primary then return false end
+            targetPos = primary.Position
+        end
+    else
+        targetPos = cp.Position
+    end
+    
+    return teleportToPosition(targetPos)
+end
+
 local function updateStatus(text, color)
     if UI.StatusLabel then
         UI.StatusLabel.Text = text
@@ -139,71 +171,207 @@ local function updateProgress(current, total)
     end
 end
 
--- Main teleport loop
+local function addWaypoint(name, pos, rot)
+    local waypoint = {
+        name = name or string.format("Waypoint %d", #state.waypoints + 1),
+        pos = pos,
+        rot = rot,
+        timestamp = os.time(),
+    }
+    table.insert(state.waypoints, waypoint)
+    return waypoint
+end
+
+local function markCurrentPosition()
+    local char, hrp, hum = getCharacter()
+    if not char or not hrp then
+        updateStatus("❌ No character", Color3.fromRGB(255, 100, 100))
+        return nil
+    end
+    
+    local cam = workspace.CurrentCamera
+    local wp = addWaypoint(
+        string.format("WP_%d", #state.waypoints + 1),
+        hrp.Position,
+        cam and cam.CFrame or hrp.CFrame
+    )
+    
+    updateStatus(string.format("✅ Marked: %s", wp.name), Color3.fromRGB(80, 255, 120))
+    return wp
+end
+
+local function deleteWaypoint(index)
+    if index > 0 and index <= #state.waypoints then
+        local wp = state.waypoints[index]
+        table.remove(state.waypoints, index)
+        updateStatus(string.format("🗑 Deleted: %s", wp.name), Color3.fromRGB(200, 100, 100))
+        return true
+    end
+    return false
+end
+
+local function saveWaypointsToFile(filename)
+    if not writefile then
+        updateStatus("❌ writefile unavailable", Color3.fromRGB(255, 100, 100))
+        return false
+    end
+    
+    local data = {
+        version = "3.0",
+        waypoints = {},
+        savedAt = os.time(),
+        mapName = workspace.Name or "Unknown",
+    }
+    
+    for _, wp in ipairs(state.waypoints) do
+        table.insert(data.waypoints, {
+            name = wp.name,
+            pos = {wp.pos.X, wp.pos.Y, wp.pos.Z},
+            rot = wp.rot and {
+                wp.rot.X, wp.rot.Y, wp.rot.Z,
+                wp.rot.LookVector.X, wp.rot.LookVector.Y, wp.rot.LookVector.Z
+            } or nil,
+            timestamp = wp.timestamp,
+        })
+    end
+    
+    local json = HttpService:JSONEncode(data)
+    local path = "affan_waypoints_" .. filename .. ".json"
+    
+    pcall(function()
+        writefile(path, json)
+    end)
+    
+    updateStatus(string.format("💾 Saved: %s", filename), Color3.fromRGB(80, 255, 120))
+    return true
+end
+
+local function loadWaypointsFromFile(filename)
+    if not readfile then
+        updateStatus("❌ readfile unavailable", Color3.fromRGB(255, 100, 100))
+        return false
+    end
+    
+    local path = "affan_waypoints_" .. filename .. ".json"
+    
+    local success, json = pcall(function()
+        return readfile(path)
+    end)
+    
+    if not success then
+        updateStatus("❌ File not found", Color3.fromRGB(255, 100, 100))
+        return false
+    end
+    
+    local data = HttpService:JSONDecode(json)
+    
+    state.waypoints = {}
+    for _, wp in ipairs(data.waypoints or {}) do
+        local pos = Vector3.new(wp.pos[1], wp.pos[2], wp.pos[3])
+        local rot = nil
+        if wp.rot then
+            rot = CFrame.new(wp.rot[1], wp.rot[2], wp.rot[3], wp.rot[4], wp.rot[5], wp.rot[6])
+        end
+        addWaypoint(wp.name, pos, rot)
+    end
+    
+    updateStatus(string.format("📂 Loaded: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    return true
+end
+
+local function listSavedFiles()
+    if not listfiles then return {} end
+    
+    local files = {}
+    local success, result = pcall(function() return listfiles() end)
+    
+    if not success then return files end
+    
+    for _, path in ipairs(result) do
+        local filename = path:match("affan_waypoints_(.+)%.json$")
+        if filename then
+            table.insert(files, filename)
+        end
+    end
+    
+    return files
+end
+
+
 local function startTeleporting()
     if state.running then return end
-    if #state.checkpoints == 0 then
-        updateStatus("⚠ No checkpoints found", Color3.fromRGB(255, 200, 50))
+    
+    local items = state.currentMode == "checkpoint" and state.checkpoints or state.waypoints
+    
+    if #items == 0 then
+        updateStatus("⚠ No items", Color3.fromRGB(255, 200, 50))
         return
     end
     
     state.running = true
+    state.paused = false
     state.currentIndex = 1
     updateStatus("🚀 Teleporting...", Color3.fromRGB(80, 255, 120))
+    updateProgress(0, #items)
     
     task.spawn(function()
         while state.running do
             if not state.paused then
-                -- Check character still valid
                 local char, hrp, hum = getCharacter()
-                if not char or not hrp or not hum or hum.Health <= 0 then
+                if not char or not hrp or not hum then
                     state.running = false
-                    updateStatus("❌ Character died/invalid", Color3.fromRGB(255, 100, 100))
+                    state.paused = false
+                    updateStatus("❌ Character invalid", Color3.fromRGB(255, 100, 100))
                     if UI.StartBtn then
-                        UI.StartBtn.Text = "▶ START TELEPORT"
+                        UI.StartBtn.Text = "▶ START"
                         UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
                     end
                     break
                 end
                 
-                local cp = state.checkpoints[state.currentIndex]
+                local item = items[state.currentIndex]
+                local success = false
                 
-                if cp and cp.Parent then
-                    local success = teleportToCP(cp)
+                if state.currentMode == "checkpoint" then
+                    success = teleportToCP(item)
+                else
+                    if item and item.pos then
+                        success = teleportToPosition(item.pos)
+                    end
+                end
+                
+                if success then
+                    updateProgress(state.currentIndex, #items)
+                    state.currentIndex = state.currentIndex + 1
                     
-                    if success then
-                        updateProgress(state.currentIndex, #state.checkpoints)
-                        
-                        state.currentIndex = state.currentIndex + 1
-                        
-                        -- Reached summit
-                        if state.currentIndex > #state.checkpoints then
-                            if state.loopEnabled then
-                                updateStatus("🔄 Loop: Restarting...", Color3.fromRGB(100, 150, 255))
-                                state.currentIndex = 1
-                                task.wait(state.delayBetweenTP * 2)
-                            else
-                                state.running = false
-                                updateStatus("✅ Summit reached!", Color3.fromRGB(80, 255, 120))
-                                updateProgress(#state.checkpoints, #state.checkpoints)
-                                -- Reset button UI
-                                if UI.StartBtn then
-                                    UI.StartBtn.Text = "▶ START TELEPORT"
-                                    UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
-                                end
-                                break
-                            end
+                    if state.currentIndex > #items then
+                        if state.loopEnabled then
+                            updateStatus("🔄 Loop restart", Color3.fromRGB(100, 150, 255))
+                            state.currentIndex = 1
+                            updateProgress(0, #items)
+                            task.wait(state.delayBetweenTP * 2)
                         else
-                            task.wait(state.delayBetweenTP)
+                            state.running = false
+                            state.paused = false
+                            updateStatus("✅ Complete!", Color3.fromRGB(80, 255, 120))
+                            updateProgress(#items, #items)
+                            if UI.StartBtn then
+                                UI.StartBtn.Text = "▶ START"
+                                UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+                            end
+                            break
                         end
                     else
-                        updateStatus("❌ Teleport failed", Color3.fromRGB(255, 100, 100))
-                        state.running = false
-                        break
+                        task.wait(state.delayBetweenTP)
                     end
                 else
-                    updateStatus("❌ Checkpoint invalid", Color3.fromRGB(255, 100, 100))
                     state.running = false
+                    state.paused = false
+                    updateStatus("❌ TP failed", Color3.fromRGB(255, 100, 100))
+                    if UI.StartBtn then
+                        UI.StartBtn.Text = "▶ START"
+                        UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+                    end
                     break
                 end
             else
@@ -218,9 +386,8 @@ local function stopTeleporting()
     state.paused = false
     updateStatus("⏹ Stopped", Color3.fromRGB(150, 150, 150))
     
-    -- Reset UI button states
     if UI.StartBtn then
-        UI.StartBtn.Text = "▶ START TELEPORT"
+        UI.StartBtn.Text = "▶ START"
         UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
     end
     if UI.PauseBtn then
@@ -228,18 +395,96 @@ local function stopTeleporting()
     end
 end
 
--- Create UI
-local function createUI()
-    -- Declare cleanup connections at top scope
-    local inputEndedConn
-    local inputChangedConn
+local function refreshWaypointList()
+    if not UI.WaypointList then return end
     
+    for _, child in ipairs(UI.WaypointList:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    for i, wp in ipairs(state.waypoints) do
+        local Item = Instance.new("Frame")
+        Item.Size = UDim2.new(1, -10, 0, 30)
+        Item.Position = UDim2.new(0, 5, 0, (i-1) * 32)
+        Item.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+        Item.BorderSizePixel = 0
+        Item.Parent = UI.WaypointList
+        
+        local ItemCorner = Instance.new("UICorner")
+        ItemCorner.CornerRadius = UDim.new(0, 4)
+        ItemCorner.Parent = Item
+        
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -80, 1, 0)
+        Label.Position = UDim2.new(0, 8, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = string.format("%d. %s", i, wp.name)
+        Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        Label.Font = Enum.Font.Gotham
+        Label.TextSize = 11
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.TextTruncate = Enum.TextTruncate.AtEnd
+        Label.Parent = Item
+        
+        local TPBtn = Instance.new("TextButton")
+        TPBtn.Size = UDim2.new(0, 35, 0, 22)
+        TPBtn.Position = UDim2.new(1, -70, 0.5, -11)
+        TPBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        TPBtn.BorderSizePixel = 0
+        TPBtn.Text = "TP"
+        TPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        TPBtn.Font = Enum.Font.GothamBold
+        TPBtn.TextSize = 10
+        TPBtn.Parent = Item
+        
+        local TPBtnCorner = Instance.new("UICorner")
+        TPBtnCorner.CornerRadius = UDim.new(0, 4)
+        TPBtnCorner.Parent = TPBtn
+        
+        TPBtn.MouseButton1Click:Connect(function()
+            teleportToPosition(wp.pos)
+            updateStatus(string.format("🚀 TP: %s", wp.name), Color3.fromRGB(80, 255, 120))
+        end)
+        
+        local DelBtn = Instance.new("TextButton")
+        DelBtn.Size = UDim2.new(0, 28, 0, 22)
+        DelBtn.Position = UDim2.new(1, -32, 0.5, -11)
+        DelBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+        DelBtn.BorderSizePixel = 0
+        DelBtn.Text = "✕"
+        DelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        DelBtn.Font = Enum.Font.GothamBold
+        DelBtn.TextSize = 12
+        DelBtn.Parent = Item
+        
+        local DelBtnCorner = Instance.new("UICorner")
+        DelBtnCorner.CornerRadius = UDim.new(0, 4)
+        DelBtnCorner.Parent = DelBtn
+        
+        DelBtn.MouseButton1Click:Connect(function()
+            deleteWaypoint(i)
+            refreshWaypointList()
+            if UI.WaypointListLabel then
+                UI.WaypointListLabel.Text = string.format("🎯 Waypoints (%d)", #state.waypoints)
+            end
+        end)
+    end
+    
+    UI.WaypointList.CanvasSize = UDim2.new(0, 0, 0, #state.waypoints * 32)
+    
+    if UI.WaypointListLabel then
+        UI.WaypointListLabel.Text = string.format("🎯 Waypoints (%d)", #state.waypoints)
+    end
+end
+
+local function createUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "AffanCheckpointTP"
+    ScreenGui.Name = "AffanWaypointTP"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Protect from anti-cheat
     if syn and syn.protect_gui then
         syn.protect_gui(ScreenGui)
         ScreenGui.Parent = game:GetService("CoreGui")
@@ -247,36 +492,34 @@ local function createUI()
         ScreenGui.Parent = player:WaitForChild("PlayerGui")
     end
     
-    -- Main Frame
     local Main = Instance.new("Frame")
     Main.Name = "Main"
-    Main.Size = UDim2.new(0, 320, 0, 400)
-    Main.Position = UDim2.new(0.5, -160, 0.2, 0)
-    Main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    Main.Size = UDim2.new(0, 380, 0, 520)
+    Main.Position = UDim2.new(0.5, -190, 0.15, 0)
+    Main.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     Main.BorderSizePixel = 0
     Main.Active = true
     Main.Draggable = true
     Main.Parent = ScreenGui
     
     local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 10)
+    MainCorner.CornerRadius = UDim.new(0, 12)
     MainCorner.Parent = Main
     
-    -- Title Bar
     local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 40)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    TitleBar.Size = UDim2.new(1, 0, 0, 45)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = Main
     
     local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 10)
+    TitleCorner.CornerRadius = UDim.new(0, 12)
     TitleCorner.Parent = TitleBar
     
     local TitleFill = Instance.new("Frame")
-    TitleFill.Size = UDim2.new(1, 0, 0, 10)
-    TitleFill.Position = UDim2.new(0, 0, 1, -10)
-    TitleFill.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    TitleFill.Size = UDim2.new(1, 0, 0, 12)
+    TitleFill.Position = UDim2.new(0, 0, 1, -12)
+    TitleFill.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
     TitleFill.BorderSizePixel = 0
     TitleFill.Parent = TitleBar
     
@@ -284,70 +527,62 @@ local function createUI()
     Title.Size = UDim2.new(1, -50, 1, 0)
     Title.Position = UDim2.new(0, 15, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "🎯 AFFAN Checkpoint TP"
+    Title.Text = "🎯 AFFAN Waypoint System"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 16
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TitleBar
     
-    -- Close Button
     local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-    CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+    CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+    CloseBtn.Position = UDim2.new(1, -38, 0, 7)
     CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     CloseBtn.BorderSizePixel = 0
     CloseBtn.Text = "✕"
     CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 14
+    CloseBtn.TextSize = 16
     CloseBtn.Parent = TitleBar
     
     local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 6)
+    CloseCorner.CornerRadius = UDim.new(0, 8)
     CloseCorner.Parent = CloseBtn
     
     CloseBtn.MouseButton1Click:Connect(function()
         stopTeleporting()
-        
-        -- Cleanup connections
-        if inputEndedConn then inputEndedConn:Disconnect() end
-        if inputChangedConn then inputChangedConn:Disconnect() end
-        
+        cleanupAllConnections()
         ScreenGui:Destroy()
     end)
     
-    -- Status Label
     local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, -30, 0, 25)
-    StatusLabel.Position = UDim2.new(0, 15, 0, 50)
+    StatusLabel.Size = UDim2.new(1, -30, 0, 22)
+    StatusLabel.Position = UDim2.new(0, 15, 0, 55)
     StatusLabel.BackgroundTransparency = 1
     StatusLabel.Text = "● Idle"
     StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 13
+    StatusLabel.TextSize = 12
     StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
     StatusLabel.Parent = Main
     UI.StatusLabel = StatusLabel
     
-    -- Progress Label
     local ProgressLabel = Instance.new("TextLabel")
-    ProgressLabel.Size = UDim2.new(1, -30, 0, 20)
-    ProgressLabel.Position = UDim2.new(0, 15, 0, 78)
+    ProgressLabel.Size = UDim2.new(1, -30, 0, 18)
+    ProgressLabel.Position = UDim2.new(0, 15, 0, 80)
     ProgressLabel.BackgroundTransparency = 1
     ProgressLabel.Text = "Progress: 0/0"
     ProgressLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     ProgressLabel.Font = Enum.Font.Gotham
-    ProgressLabel.TextSize = 12
+    ProgressLabel.TextSize = 11
     ProgressLabel.TextXAlignment = Enum.TextXAlignment.Left
     ProgressLabel.Parent = Main
     UI.ProgressLabel = ProgressLabel
     
-    -- Progress Bar Background
     local ProgressBG = Instance.new("Frame")
-    ProgressBG.Size = UDim2.new(1, -30, 0, 8)
+    ProgressBG.Size = UDim2.new(1, -30, 0, 6)
     ProgressBG.Position = UDim2.new(0, 15, 0, 102)
-    ProgressBG.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+    ProgressBG.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     ProgressBG.BorderSizePixel = 0
     ProgressBG.Parent = Main
     
@@ -355,7 +590,6 @@ local function createUI()
     ProgressBGCorner.CornerRadius = UDim.new(1, 0)
     ProgressBGCorner.Parent = ProgressBG
     
-    -- Progress Bar Fill
     local ProgressBar = Instance.new("Frame")
     ProgressBar.Size = UDim2.new(0, 0, 1, 0)
     ProgressBar.BackgroundColor3 = Color3.fromRGB(80, 150, 255)
@@ -367,17 +601,18 @@ local function createUI()
     ProgressBarCorner.Parent = ProgressBar
     UI.ProgressBar = ProgressBar
     
-    -- Button Helper
+
+
     local function createButton(text, yPos, color, callback)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -30, 0, 40)
+        btn.Size = UDim2.new(0.48, -2, 0, 38)
         btn.Position = UDim2.new(0, 15, 0, yPos)
         btn.BackgroundColor3 = color
         btn.BorderSizePixel = 0
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 14
+        btn.TextSize = 13
         btn.AutoButtonColor = false
         btn.Parent = Main
         
@@ -386,17 +621,17 @@ local function createUI()
         btnCorner.Parent = btn
         
         btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.15), {
+            TweenService:Create(btn, TweenInfo.new(0.12), {
                 BackgroundColor3 = Color3.new(
-                    math.min(color.R + 0.1, 1),
-                    math.min(color.G + 0.1, 1),
-                    math.min(color.B + 0.1, 1)
+                    math.min(color.R + 0.08, 1),
+                    math.min(color.G + 0.08, 1),
+                    math.min(color.B + 0.08, 1)
                 )
             }):Play()
         end)
         
         btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.15), {
+            TweenService:Create(btn, TweenInfo.new(0.12), {
                 BackgroundColor3 = color
             }):Play()
         end)
@@ -405,23 +640,128 @@ local function createUI()
         return btn
     end
     
-    -- Scan Button
-    createButton("🔍 SCAN CHECKPOINTS", 125, Color3.fromRGB(60, 120, 200), function()
+    local function createButtonRight(text, yPos, color, callback)
+        local btn = createButton(text, yPos, color, callback)
+        btn.Position = UDim2.new(0.52, 2, 0, yPos)
+        return btn
+    end
+    
+    local ModeLabel = Instance.new("TextLabel")
+    ModeLabel.Size = UDim2.new(0, 80, 0, 18)
+    ModeLabel.Position = UDim2.new(0, 15, 0, 120)
+    ModeLabel.BackgroundTransparency = 1
+    ModeLabel.Text = "Mode:"
+    ModeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    ModeLabel.Font = Enum.Font.Gotham
+    ModeLabel.TextSize = 11
+    ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ModeLabel.Parent = Main
+    
+    local ModeToggle = Instance.new("TextButton")
+    ModeToggle.Size = UDim2.new(0, 110, 0, 26)
+    ModeToggle.Position = UDim2.new(0, 100, 0, 116)
+    ModeToggle.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+    ModeToggle.BorderSizePixel = 0
+    ModeToggle.Text = "📍 Checkpoint"
+    ModeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ModeToggle.Font = Enum.Font.GothamBold
+    ModeToggle.TextSize = 11
+    ModeToggle.Parent = Main
+    
+    local ModeToggleCorner = Instance.new("UICorner")
+    ModeToggleCorner.CornerRadius = UDim.new(0, 6)
+    ModeToggleCorner.Parent = ModeToggle
+    
+    ModeToggle.MouseButton1Click:Connect(function()
+        state.currentMode = state.currentMode == "checkpoint" and "waypoint" or "checkpoint"
+        if state.currentMode == "checkpoint" then
+            ModeToggle.Text = "📍 Checkpoint"
+            ModeToggle.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        else
+            ModeToggle.Text = "🎯 Waypoint"
+            ModeToggle.BackgroundColor3 = Color3.fromRGB(200, 100, 180)
+        end
+        updateStatus(string.format("Mode: %s", state.currentMode), Color3.fromRGB(200, 200, 200))
+    end)
+    
+    createButton("🔍 SCAN", 150, Color3.fromRGB(60, 120, 200), function()
         state.checkpoints = scanCheckpoints()
         if #state.checkpoints > 0 then
-            updateStatus(string.format("✅ Found %d checkpoints", #state.checkpoints), Color3.fromRGB(80, 255, 120))
+            updateStatus(string.format("✅ Found %d CPs", #state.checkpoints), Color3.fromRGB(80, 255, 120))
             updateProgress(0, #state.checkpoints)
         else
-            updateStatus("⚠ No checkpoints found", Color3.fromRGB(255, 200, 50))
+            updateStatus("⚠ No checkpoints", Color3.fromRGB(255, 200, 50))
         end
     end)
     
-    -- Start/Stop Button
-    local StartBtn = createButton("▶ START TELEPORT", 175, Color3.fromRGB(0, 180, 80), function()
+    createButtonRight("📌 MARK", 150, Color3.fromRGB(180, 100, 200), function()
+        markCurrentPosition()
+        refreshWaypointList()
+    end)
+    
+    local SaveLoadLabel = Instance.new("TextLabel")
+    SaveLoadLabel.Size = UDim2.new(1, -30, 0, 18)
+    SaveLoadLabel.Position = UDim2.new(0, 15, 0, 198)
+    SaveLoadLabel.BackgroundTransparency = 1
+    SaveLoadLabel.Text = "💾 Save/Load Waypoints"
+    SaveLoadLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    SaveLoadLabel.Font = Enum.Font.GothamBold
+    SaveLoadLabel.TextSize = 12
+    SaveLoadLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SaveLoadLabel.Parent = Main
+    
+    local FileLabel = Instance.new("TextLabel")
+    FileLabel.Size = UDim2.new(1, -30, 0, 28)
+    FileLabel.Position = UDim2.new(0, 15, 0, 220)
+    FileLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    FileLabel.BorderSizePixel = 0
+    FileLabel.Text = "📁 Auto-named on save"
+    FileLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    FileLabel.Font = Enum.Font.Gotham
+    FileLabel.TextSize = 11
+    FileLabel.TextXAlignment = Enum.TextXAlignment.Left
+    FileLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    FileLabel.Parent = Main
+    UI.FileLabel = FileLabel
+    
+    local FileLabelCorner = Instance.new("UICorner")
+    FileLabelCorner.CornerRadius = UDim.new(0, 6)
+    FileLabelCorner.Parent = FileLabel
+    
+    local FileLabelPadding = Instance.new("UIPadding")
+    FileLabelPadding.PaddingLeft = UDim.new(0, 10)
+    FileLabelPadding.Parent = FileLabel
+    
+    createButton("💾 SAVE", 255, Color3.fromRGB(0, 150, 80), function()
+        if #state.waypoints == 0 then
+            updateStatus("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
+            return
+        end
+        
+        local filename = "wp_" .. os.date("%m%d_%H%M")
+        saveWaypointsToFile(filename)
+        FileLabel.Text = "📁 " .. filename
+        state.selectedFile = filename
+    end)
+    
+    createButtonRight("📂 LOAD", 255, Color3.fromRGB(200, 140, 0), function()
+        local files = listSavedFiles()
+        if #files == 0 then
+            updateStatus("⚠ No saved files", Color3.fromRGB(255, 200, 50))
+            return
+        end
+        
+        local filename = state.selectedFile or files[1]
+        
+        if loadWaypointsFromFile(filename) then
+            refreshWaypointList()
+            FileLabel.Text = "📁 " .. filename
+        end
+    end)
+    
+    local StartBtn = createButton("▶ START", 295, Color3.fromRGB(0, 180, 80), function()
         if state.running then
             stopTeleporting()
-            StartBtn.Text = "▶ START TELEPORT"
-            StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
         else
             startTeleporting()
             StartBtn.Text = "⏹ STOP"
@@ -430,8 +770,7 @@ local function createUI()
     end)
     UI.StartBtn = StartBtn
     
-    -- Pause Button
-    local PauseBtn = createButton("⏸ PAUSE", 225, Color3.fromRGB(200, 140, 0), function()
+    local PauseBtn = createButtonRight("⏸ PAUSE", 295, Color3.fromRGB(200, 140, 0), function()
         if state.running then
             state.paused = not state.paused
             if state.paused then
@@ -445,21 +784,20 @@ local function createUI()
     end)
     UI.PauseBtn = PauseBtn
     
-    -- Loop Toggle
     local LoopLabel = Instance.new("TextLabel")
-    LoopLabel.Size = UDim2.new(0, 150, 0, 20)
-    LoopLabel.Position = UDim2.new(0, 15, 0, 280)
+    LoopLabel.Size = UDim2.new(0, 120, 0, 18)
+    LoopLabel.Position = UDim2.new(0, 15, 0, 345)
     LoopLabel.BackgroundTransparency = 1
     LoopLabel.Text = "🔄 Loop Mode:"
     LoopLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     LoopLabel.Font = Enum.Font.Gotham
-    LoopLabel.TextSize = 12
+    LoopLabel.TextSize = 11
     LoopLabel.TextXAlignment = Enum.TextXAlignment.Left
     LoopLabel.Parent = Main
     
     local LoopToggle = Instance.new("TextButton")
-    LoopToggle.Size = UDim2.new(0, 80, 0, 28)
-    LoopToggle.Position = UDim2.new(1, -95, 0, 276)
+    LoopToggle.Size = UDim2.new(0, 70, 0, 26)
+    LoopToggle.Position = UDim2.new(1, -85, 0, 341)
     LoopToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 70)
     LoopToggle.BorderSizePixel = 0
     LoopToggle.Text = "ON"
@@ -475,27 +813,27 @@ local function createUI()
     LoopToggle.MouseButton1Click:Connect(function()
         state.loopEnabled = not state.loopEnabled
         LoopToggle.Text = state.loopEnabled and "ON" or "OFF"
-        LoopToggle.BackgroundColor3 = state.loopEnabled and Color3.fromRGB(0, 150, 70) or Color3.fromRGB(60, 60, 70)
+        LoopToggle.BackgroundColor3 = state.loopEnabled 
+            and Color3.fromRGB(0, 150, 70) 
+            or Color3.fromRGB(60, 60, 70)
     end)
     
-    -- Delay Label
     local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(1, -30, 0, 20)
-    DelayLabel.Position = UDim2.new(0, 15, 0, 315)
+    DelayLabel.Size = UDim2.new(1, -30, 0, 18)
+    DelayLabel.Position = UDim2.new(0, 15, 0, 375)
     DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Text = string.format("⏱ Delay Between TP: %.1fs", state.delayBetweenTP)
+    DelayLabel.Text = string.format("⏱ Delay: %.1fs", state.delayBetweenTP)
     DelayLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 12
+    DelayLabel.TextSize = 11
     DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
     DelayLabel.Parent = Main
     UI.DelayLabel = DelayLabel
     
-    -- Delay Slider Background
     local SliderBG = Instance.new("Frame")
-    SliderBG.Size = UDim2.new(1, -30, 0, 8)
-    SliderBG.Position = UDim2.new(0, 15, 0, 340)
-    SliderBG.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+    SliderBG.Size = UDim2.new(1, -30, 0, 6)
+    SliderBG.Position = UDim2.new(0, 15, 0, 397)
+    SliderBG.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     SliderBG.BorderSizePixel = 0
     SliderBG.Parent = Main
     
@@ -503,7 +841,6 @@ local function createUI()
     SliderBGCorner.CornerRadius = UDim.new(1, 0)
     SliderBGCorner.Parent = SliderBG
     
-    -- Delay Slider Fill
     local SliderFill = Instance.new("Frame")
     local initialPos = (state.delayBetweenTP - 0.1) / 2.9
     SliderFill.Size = UDim2.new(initialPos, 0, 1, 0)
@@ -515,10 +852,9 @@ local function createUI()
     SliderFillCorner.CornerRadius = UDim.new(1, 0)
     SliderFillCorner.Parent = SliderFill
     
-    -- Slider Knob
     local SliderKnob = Instance.new("Frame")
-    SliderKnob.Size = UDim2.new(0, 16, 0, 16)
-    SliderKnob.Position = UDim2.new(initialPos, -8, 0.5, -8)
+    SliderKnob.Size = UDim2.new(0, 14, 0, 14)
+    SliderKnob.Position = UDim2.new(initialPos, -7, 0.5, -7)
     SliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     SliderKnob.BorderSizePixel = 0
     SliderKnob.Parent = SliderBG
@@ -535,57 +871,89 @@ local function createUI()
         end
     end)
     
-    inputEndedConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+    addConnection(UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
         end
-    end)
+    end))
     
-    inputChangedConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
+    addConnection(UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local pos = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
+            local pos = math.clamp(
+                (input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 
+                0, 1
+            )
             local delay = 0.1 + (pos * 2.9)
             state.delayBetweenTP = math.floor(delay * 10) / 10
             
             SliderFill.Size = UDim2.new(pos, 0, 1, 0)
-            SliderKnob.Position = UDim2.new(pos, -8, 0.5, -8)
-            DelayLabel.Text = string.format("⏱ Delay Between TP: %.1fs", state.delayBetweenTP)
+            SliderKnob.Position = UDim2.new(pos, -7, 0.5, -7)
+            DelayLabel.Text = string.format("⏱ Delay: %.1fs", state.delayBetweenTP)
         end
-    end)
+    end))
     
-    -- Version Label
+    local WaypointListLabel = Instance.new("TextLabel")
+    WaypointListLabel.Size = UDim2.new(1, -30, 0, 18)
+    WaypointListLabel.Position = UDim2.new(0, 15, 0, 412)
+    WaypointListLabel.BackgroundTransparency = 1
+    WaypointListLabel.Text = "🎯 Waypoints (0)"
+    WaypointListLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    WaypointListLabel.Font = Enum.Font.GothamBold
+    WaypointListLabel.TextSize = 12
+    WaypointListLabel.TextXAlignment = Enum.TextXAlignment.Left
+    WaypointListLabel.Parent = Main
+    UI.WaypointListLabel = WaypointListLabel
+    
+    local WaypointListBG = Instance.new("Frame")
+    WaypointListBG.Size = UDim2.new(1, -30, 0, 60)
+    WaypointListBG.Position = UDim2.new(0, 15, 0, 435)
+    WaypointListBG.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    WaypointListBG.BorderSizePixel = 0
+    WaypointListBG.Parent = Main
+    
+    local WaypointListBGCorner = Instance.new("UICorner")
+    WaypointListBGCorner.CornerRadius = UDim.new(0, 8)
+    WaypointListBGCorner.Parent = WaypointListBG
+    
+    local WaypointList = Instance.new("ScrollingFrame")
+    WaypointList.Size = UDim2.new(1, 0, 1, 0)
+    WaypointList.BackgroundTransparency = 1
+    WaypointList.BorderSizePixel = 0
+    WaypointList.ScrollBarThickness = 4
+    WaypointList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    WaypointList.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
+    WaypointList.Parent = WaypointListBG
+    UI.WaypointList = WaypointList
+    
     local Version = Instance.new("TextLabel")
-    Version.Size = UDim2.new(1, -30, 0, 18)
-    Version.Position = UDim2.new(0, 15, 1, -25)
+    Version.Size = UDim2.new(1, -30, 0, 16)
+    Version.Position = UDim2.new(0, 15, 1, -20)
     Version.BackgroundTransparency = 1
-    Version.Text = "AFFAN v2.0 | No WindUI"
+    Version.Text = "AFFAN v3.0 | Waypoint System"
     Version.TextColor3 = Color3.fromRGB(100, 100, 100)
     Version.Font = Enum.Font.Gotham
-    Version.TextSize = 10
+    Version.TextSize = 9
     Version.TextXAlignment = Enum.TextXAlignment.Center
     Version.Parent = Main
     
     return ScreenGui
 end
 
--- Initialize
 local gui = createUI()
 updateStatus("● Idle", Color3.fromRGB(150, 150, 150))
 
--- Character respawn handling
-player.CharacterAdded:Connect(function()
+addConnection(player.CharacterAdded:Connect(function()
     stopTeleporting()
-    task.wait(1)
+    task.wait(0.5)
     updateStatus("● Character respawned", Color3.fromRGB(200, 200, 80))
-end)
+end))
 
--- Notification
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "AFFAN Checkpoint TP",
-        Text = "✅ v2.0 loaded | Click SCAN to start",
+        Title = "AFFAN v3.0",
+        Text = "✅ Waypoint System loaded",
         Duration = 4,
     })
 end)
 
-print("[AFFAN] Checkpoint Teleporter v2.0 loaded")
+print("[AFFAN] v3.0 Waypoint System loaded")
