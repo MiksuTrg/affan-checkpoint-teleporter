@@ -278,70 +278,53 @@ local function deleteWaypoint(index)
     return false
 end
 
-local function exportToClipboard()
-    if #state.waypoints == 0 then
-        updateStatus("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
+local function mergeCheckpointFiles()
+    if not listfiles or not readfile then
+        updateStatus("❌ File functions unavailable", Color3.fromRGB(255, 100, 100))
         return false
     end
     
-    local data = {
-        version = "3.3",
-        waypoints = {},
-        savedAt = os.time(),
-        mapName = workspace.Name or "Unknown",
-    }
-    
-    for _, wp in ipairs(state.waypoints) do
-        table.insert(data.waypoints, {
-            name = wp.name,
-            pos = {wp.pos.X, wp.pos.Y, wp.pos.Z},
-            rot = wp.rot and {
-                wp.rot:GetComponents()
-            } or nil,
-            timestamp = wp.timestamp,
-        })
+    local files = listSavedFiles()
+    if #files == 0 then
+        updateStatus("⚠ No files to merge", Color3.fromRGB(255, 200, 50))
+        return false
     end
     
-    local json = HttpService:JSONEncode(data)
+    local mergedWaypoints = {}
+    local seenPositions = {}
+    local totalLoaded = 0
     
-    if setclipboard then
-        pcall(function()
-            setclipboard(json)
-            updateStatus(string.format("📤 Copied: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    for _, filename in ipairs(files) do
+        local path = "affan_waypoints_" .. filename .. ".json"
+        local success, json = pcall(function()
+            return readfile(path)
         end)
-    else
-        updateStatus("❌ Clipboard unavailable", Color3.fromRGB(255, 100, 100))
+        
+        if success and json then
+            local ok, data = pcall(function()
+                return HttpService:JSONDecode(json)
+            end)
+            
+            if ok and data.waypoints then
+                for _, wp in ipairs(data.waypoints) do
+                    local posKey = string.format("%.1f_%.1f_%.1f", wp.pos[1], wp.pos[2], wp.pos[3])
+                    if not seenPositions[posKey] then
+                        table.insert(mergedWaypoints, wp)
+                        seenPositions[posKey] = true
+                        totalLoaded = totalLoaded + 1
+                    end
+                end
+            end
+        end
     end
     
-    return json
-end
-
-local function importFromClipboard()
-    if not getclipboard then
-        updateStatus("❌ Clipboard unavailable", Color3.fromRGB(255, 100, 100))
-        return false
-    end
-    
-    local success, json = pcall(function()
-        return getclipboard()
-    end)
-    
-    if not success or not json or json == "" then
-        updateStatus("❌ Clipboard empty", Color3.fromRGB(255, 100, 100))
-        return false
-    end
-    
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(json)
-    end)
-    
-    if not ok or not data.waypoints then
-        updateStatus("❌ Invalid format", Color3.fromRGB(255, 100, 100))
+    if totalLoaded == 0 then
+        updateStatus("❌ No waypoints found", Color3.fromRGB(255, 100, 100))
         return false
     end
     
     state.waypoints = {}
-    for _, wp in ipairs(data.waypoints or {}) do
+    for _, wp in ipairs(mergedWaypoints) do
         local pos = Vector3.new(wp.pos[1], wp.pos[2], wp.pos[3])
         local rot = nil
         if wp.rot and #wp.rot == 12 then
@@ -350,7 +333,14 @@ local function importFromClipboard()
         addWaypoint(wp.name, pos, rot)
     end
     
-    updateStatus(string.format("📥 Imported: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    local mergedFilename = "merged_" .. os.date("%m%d_%H%M")
+    saveWaypointsToFile(mergedFilename)
+    
+    updateStatus(string.format("✅ Merged: %d files → %d waypoints", #files, totalLoaded), Color3.fromRGB(80, 255, 120))
+    if UI.FileLabel then
+        UI.FileLabel.Text = mergedFilename
+    end
+    
     return true
 end
 
@@ -865,46 +855,11 @@ local function createUI()
         end
     end)
     
-    -- Export/Import Row (compact, side by side)
-    local ExportBtn = Instance.new("TextButton")
-    ExportBtn.Size = UDim2.new(0.48, 0, 0, 28)
-    ExportBtn.Position = UDim2.new(0, 0, 0, 184)
-    ExportBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 200)
-    ExportBtn.BorderSizePixel = 0
-    ExportBtn.Text = "📤 EXPORT"
-    ExportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ExportBtn.Font = Enum.Font.GothamBold
-    ExportBtn.TextSize = 10
-    ExportBtn.Parent = LeftPanel
-    
-    local ExportBtnCorner = Instance.new("UICorner")
-    ExportBtnCorner.CornerRadius = UDim.new(0, 6)
-    ExportBtnCorner.Parent = ExportBtn
-    
-    addConnection(ExportBtn.MouseButton1Click:Connect(function()
-        exportToClipboard()
-    end))
-    
-    local ImportBtn = Instance.new("TextButton")
-    ImportBtn.Size = UDim2.new(0.48, 0, 0, 28)
-    ImportBtn.Position = UDim2.new(0.52, 0, 0, 184)
-    ImportBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 200)
-    ImportBtn.BorderSizePixel = 0
-    ImportBtn.Text = "📥 IMPORT"
-    ImportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ImportBtn.Font = Enum.Font.GothamBold
-    ImportBtn.TextSize = 10
-    ImportBtn.Parent = LeftPanel
-    
-    local ImportBtnCorner = Instance.new("UICorner")
-    ImportBtnCorner.CornerRadius = UDim.new(0, 6)
-    ImportBtnCorner.Parent = ImportBtn
-    
-    addConnection(ImportBtn.MouseButton1Click:Connect(function()
-        if importFromClipboard() then
+    createBtn("🔗 MERGE", 184, Color3.fromRGB(150, 100, 200), function()
+        if mergeCheckpointFiles() then
             refreshWaypointList()
         end
-    end))
+    end)
     
     local StartBtn = createBtn("▶ START", 217, Color3.fromRGB(0, 180, 80), function()
         if state.running then
