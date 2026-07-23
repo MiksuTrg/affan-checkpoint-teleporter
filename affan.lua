@@ -76,13 +76,29 @@ local state = {
 
 local UI = {}
 local allConnections = {}
+local waypointListConnections = {}
 
 local function addConnection(conn)
     table.insert(allConnections, conn)
     return conn
 end
 
+local function addWaypointConnection(conn)
+    table.insert(waypointListConnections, conn)
+    return conn
+end
+
+local function cleanupWaypointConnections()
+    for _, conn in ipairs(waypointListConnections) do
+        if conn and conn.Connected then
+            conn:Disconnect()
+        end
+    end
+    waypointListConnections = {}
+end
+
 local function cleanupAllConnections()
+    cleanupWaypointConnections()
     for _, conn in ipairs(allConnections) do
         if conn and conn.Connected then
             conn:Disconnect()
@@ -449,6 +465,8 @@ end
 local function refreshWaypointList()
     if not UI.WaypointList then return end
     
+    cleanupWaypointConnections()
+    
     for _, child in ipairs(UI.WaypointList:GetChildren()) do
         if child:IsA("Frame") then
             child:Destroy()
@@ -494,7 +512,7 @@ local function refreshWaypointList()
         TPBtnCorner.CornerRadius = UDim.new(0, 4)
         TPBtnCorner.Parent = TPBtn
         
-        addConnection(TPBtn.MouseButton1Click:Connect(function()
+        addWaypointConnection(TPBtn.MouseButton1Click:Connect(function()
             teleportToPosition(wp.pos)
             updateStatus(string.format("🚀 TP: %s", wp.name), Color3.fromRGB(80, 255, 120))
         end))
@@ -514,7 +532,7 @@ local function refreshWaypointList()
         DelBtnCorner.CornerRadius = UDim.new(0, 4)
         DelBtnCorner.Parent = DelBtn
         
-        addConnection(DelBtn.MouseButton1Click:Connect(function()
+        addWaypointConnection(DelBtn.MouseButton1Click:Connect(function()
             deleteWaypoint(i)
             refreshWaypointList()
             if UI.WaypointListLabel then
@@ -623,17 +641,17 @@ local function createUI()
         state.minimized = not state.minimized
         if state.minimized then
             Main.Size = UDim2.new(0, 200, 0, 32)
-            LeftPanel.Visible = false
-            CenterPanel.Visible = false
-            RightPanel.Visible = false
-            Version.Visible = false
+            UI.LeftPanel.Visible = false
+            UI.CenterPanel.Visible = false
+            UI.RightPanel.Visible = false
+            UI.Version.Visible = false
             MinBtn.Text = "□"
         else
             Main.Size = UDim2.new(0, 650, 0, 280)
-            LeftPanel.Visible = true
-            CenterPanel.Visible = true
-            RightPanel.Visible = true
-            Version.Visible = true
+            UI.LeftPanel.Visible = true
+            UI.CenterPanel.Visible = true
+            UI.RightPanel.Visible = true
+            UI.Version.Visible = true
             MinBtn.Text = "_"
         end
     end))
@@ -646,10 +664,12 @@ local function createUI()
     
     -- LEFT COLUMN: Controls (200px width)
     local LeftPanel = Instance.new("Frame")
+    LeftPanel.Name = "LeftPanel"
     LeftPanel.Size = UDim2.new(0, 200, 1, -40)
     LeftPanel.Position = UDim2.new(0, 8, 0, 36)
     LeftPanel.BackgroundTransparency = 1
     LeftPanel.Parent = Main
+    UI.LeftPanel = LeftPanel
     
     -- Compact button helper
     local function createBtn(text, yPos, color, callback, parent)
@@ -817,10 +837,12 @@ local function createUI()
     
     -- CENTER COLUMN: Status & Progress (220px)
     local CenterPanel = Instance.new("Frame")
+    CenterPanel.Name = "CenterPanel"
     CenterPanel.Size = UDim2.new(0, 220, 1, -40)
     CenterPanel.Position = UDim2.new(0, 216, 0, 36)
     CenterPanel.BackgroundTransparency = 1
     CenterPanel.Parent = Main
+    UI.CenterPanel = CenterPanel
     
     local StatusLabel = Instance.new("TextLabel")
     StatusLabel.Size = UDim2.new(1, 0, 0, 18)
@@ -941,13 +963,17 @@ local function createUI()
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
+            Main.Draggable = false
         end
     end))
     
     addConnection(UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
+            if dragging then
+                dragging = false
+                Main.Draggable = true
+            end
         end
     end))
     
@@ -969,10 +995,12 @@ local function createUI()
     
     -- RIGHT COLUMN: Waypoint List (206px)
     local RightPanel = Instance.new("Frame")
+    RightPanel.Name = "RightPanel"
     RightPanel.Size = UDim2.new(0, 206, 1, -40)
     RightPanel.Position = UDim2.new(1, -214, 0, 36)
     RightPanel.BackgroundTransparency = 1
     RightPanel.Parent = Main
+    UI.RightPanel = RightPanel
     
     local WaypointListLabel = Instance.new("TextLabel")
     WaypointListLabel.Size = UDim2.new(1, 0, 0, 16)
@@ -1008,15 +1036,17 @@ local function createUI()
     
     -- Version (compact, bottom)
     local Version = Instance.new("TextLabel")
+    Version.Name = "Version"
     Version.Size = UDim2.new(1, -16, 0, 12)
     Version.Position = UDim2.new(0, 8, 1, -16)
     Version.BackgroundTransparency = 1
-    Version.Text = "AFFAN v3.1 Mobile"
+    Version.Text = "AFFAN v3.3 Mobile"
     Version.TextColor3 = Color3.fromRGB(100, 100, 100)
     Version.Font = Enum.Font.Gotham
     Version.TextSize = 8
     Version.TextXAlignment = Enum.TextXAlignment.Center
     Version.Parent = Main
+    UI.Version = Version
     
     return ScreenGui
 end
