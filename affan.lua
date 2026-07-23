@@ -47,8 +47,12 @@ end
 -- Initialize protection
 local AFFAN_AUTHORIZED = verifyScript()
 if not AFFAN_AUTHORIZED then
-    -- Silent exit - unauthorized copy won't show errors
-    return
+    -- Debug: show why it failed
+    warn("[AFFAN] Protection check failed - script may be running from unauthorized source")
+    warn("[AFFAN] Source info:", debug.info(1, "s") or "nil")
+    warn("[AFFAN] Allow local execution and official GitHub only")
+    -- Still allow to run for testing
+    -- return
 end
 
 --// MAIN SCRIPT STARTS HERE
