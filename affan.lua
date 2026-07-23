@@ -71,6 +71,7 @@ local state = {
     delayBetweenTP = 0.5,
     currentMode = "checkpoint",
     selectedFile = nil,
+    minimized = false,
 }
 
 local UI = {}
@@ -279,8 +280,7 @@ local function saveWaypointsToFile(filename)
             name = wp.name,
             pos = {wp.pos.X, wp.pos.Y, wp.pos.Z},
             rot = wp.rot and {
-                wp.rot.X, wp.rot.Y, wp.rot.Z,
-                wp.rot.LookVector.X, wp.rot.LookVector.Y, wp.rot.LookVector.Z
+                wp.rot:GetComponents()
             } or nil,
             timestamp = wp.timestamp,
         })
@@ -320,8 +320,8 @@ local function loadWaypointsFromFile(filename)
     for _, wp in ipairs(data.waypoints or {}) do
         local pos = Vector3.new(wp.pos[1], wp.pos[2], wp.pos[3])
         local rot = nil
-        if wp.rot then
-            rot = CFrame.new(wp.rot[1], wp.rot[2], wp.rot[3], wp.rot[4], wp.rot[5], wp.rot[6])
+        if wp.rot and #wp.rot == 12 then
+            rot = CFrame.new(unpack(wp.rot))
         end
         addWaypoint(wp.name, pos, rot)
     end
@@ -494,10 +494,10 @@ local function refreshWaypointList()
         TPBtnCorner.CornerRadius = UDim.new(0, 4)
         TPBtnCorner.Parent = TPBtn
         
-        TPBtn.MouseButton1Click:Connect(function()
+        addConnection(TPBtn.MouseButton1Click:Connect(function()
             teleportToPosition(wp.pos)
             updateStatus(string.format("🚀 TP: %s", wp.name), Color3.fromRGB(80, 255, 120))
-        end)
+        end))
         
         local DelBtn = Instance.new("TextButton")
         DelBtn.Size = UDim2.new(0, 28, 0, 22)
@@ -514,13 +514,13 @@ local function refreshWaypointList()
         DelBtnCorner.CornerRadius = UDim.new(0, 4)
         DelBtnCorner.Parent = DelBtn
         
-        DelBtn.MouseButton1Click:Connect(function()
+        addConnection(DelBtn.MouseButton1Click:Connect(function()
             deleteWaypoint(i)
             refreshWaypointList()
             if UI.WaypointListLabel then
                 UI.WaypointListLabel.Text = string.format("🎯 Waypoints (%d)", #state.waypoints)
             end
-        end)
+        end))
     end
     
     UI.WaypointList.CanvasSize = UDim2.new(0, 0, 0, #state.waypoints * 32)
@@ -587,6 +587,22 @@ local function createUI()
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TitleBar
     
+    -- Minimize Button
+    local MinBtn = Instance.new("TextButton")
+    MinBtn.Size = UDim2.new(0, 28, 0, 28)
+    MinBtn.Position = UDim2.new(1, -62, 0, 2)
+    MinBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+    MinBtn.BorderSizePixel = 0
+    MinBtn.Text = "_"
+    MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinBtn.Font = Enum.Font.GothamBold
+    MinBtn.TextSize = 16
+    MinBtn.Parent = TitleBar
+    
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 6)
+    MinCorner.Parent = MinBtn
+    
     -- Close Button (compact)
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.new(0, 28, 0, 28)
@@ -603,11 +619,30 @@ local function createUI()
     CloseCorner.CornerRadius = UDim.new(0, 6)
     CloseCorner.Parent = CloseBtn
     
-    CloseBtn.MouseButton1Click:Connect(function()
+    addConnection(MinBtn.MouseButton1Click:Connect(function()
+        state.minimized = not state.minimized
+        if state.minimized then
+            Main.Size = UDim2.new(0, 200, 0, 32)
+            LeftPanel.Visible = false
+            CenterPanel.Visible = false
+            RightPanel.Visible = false
+            Version.Visible = false
+            MinBtn.Text = "□"
+        else
+            Main.Size = UDim2.new(0, 650, 0, 280)
+            LeftPanel.Visible = true
+            CenterPanel.Visible = true
+            RightPanel.Visible = true
+            Version.Visible = true
+            MinBtn.Text = "_"
+        end
+    end))
+    
+    addConnection(CloseBtn.MouseButton1Click:Connect(function()
         stopTeleporting()
         cleanupAllConnections()
         ScreenGui:Destroy()
-    end)
+    end))
     
     -- LEFT COLUMN: Controls (200px width)
     local LeftPanel = Instance.new("Frame")
@@ -680,7 +715,7 @@ local function createUI()
     ModeCorner.CornerRadius = UDim.new(0, 6)
     ModeCorner.Parent = ModeToggle
     
-    ModeToggle.MouseButton1Click:Connect(function()
+    addConnection(ModeToggle.MouseButton1Click:Connect(function()
         state.currentMode = state.currentMode == "checkpoint" and "waypoint" or "checkpoint"
         if state.currentMode == "checkpoint" then
             ModeToggle.Text = "📍 Checkpoint"
@@ -689,7 +724,7 @@ local function createUI()
             ModeToggle.Text = "🎯 Waypoint"
             ModeToggle.BackgroundColor3 = Color3.fromRGB(200, 100, 180)
         end
-    end)
+    end))
     
     -- Action Buttons
     createBtn("🔍 SCAN", 52, Color3.fromRGB(60, 120, 200), function()
@@ -772,13 +807,13 @@ local function createUI()
     LoopCorner.CornerRadius = UDim.new(0, 4)
     LoopCorner.Parent = LoopToggle
     
-    LoopToggle.MouseButton1Click:Connect(function()
+    addConnection(LoopToggle.MouseButton1Click:Connect(function()
         state.loopEnabled = not state.loopEnabled
         LoopToggle.Text = state.loopEnabled and "ON" or "OFF"
         LoopToggle.BackgroundColor3 = state.loopEnabled 
             and Color3.fromRGB(0, 150, 70) 
             or Color3.fromRGB(60, 60, 70)
-    end)
+    end))
     
     -- CENTER COLUMN: Status & Progress (220px)
     local CenterPanel = Instance.new("Frame")
@@ -902,12 +937,12 @@ local function createUI()
     
     local dragging = false
     
-    SliderBG.InputBegan:Connect(function(input)
+    addConnection(SliderBG.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
         end
-    end)
+    end))
     
     addConnection(UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
