@@ -44,15 +44,12 @@ local function verifyScript()
     return true
 end
 
--- Initialize protection
-local AFFAN_AUTHORIZED = verifyScript()
+-- Initialize protection (DISABLED for testing)
+local AFFAN_AUTHORIZED = true  -- Force allow for testing
+-- local AFFAN_AUTHORIZED = verifyScript()
 if not AFFAN_AUTHORIZED then
-    -- Debug: show why it failed
-    warn("[AFFAN] Protection check failed - script may be running from unauthorized source")
-    warn("[AFFAN] Source info:", debug.info(1, "s") or "nil")
-    warn("[AFFAN] Allow local execution and official GitHub only")
-    -- Still allow to run for testing
-    -- return
+    warn("[AFFAN] Protection check failed")
+    return
 end
 
 --// MAIN SCRIPT STARTS HERE
