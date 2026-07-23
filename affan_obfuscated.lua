@@ -12,7 +12,7 @@ AFFAN_SECURITY.VERSION = "3.0"
 AFFAN_SECURITY.BUILD = "20260723"
 AFFAN_SECURITY.SIGNATURE = "AFFAN_OFFICIAL_BUILD"
 
-local function _ctpdiugz()
+local function _841aqu2k()
     local HttpService = game:GetService("HttpService")
     
     local success, clientId = pcall(function()
@@ -39,7 +39,7 @@ local function _ctpdiugz()
 end
 
 local AFFAN_AUTHORIZED = true  -- Force allow for testing
--- local AFFAN_AUTHORIZED = _ctpdiugz()
+-- local AFFAN_AUTHORIZED = _841aqu2k()
 if not AFFAN_AUTHORIZED then
     warn("[AFFAN] Protection check failed")
     return
@@ -71,17 +71,17 @@ local UI = {}
 local allConnections = {}
 local waypointListConnections = {}
 
-local function _hqpt2qw7(conn)
+local function _hs0di3ib(conn)
     table.insert(allConnections, conn)
     return conn
 end
 
-local function _cs1tpzkj(conn)
+local function _mrq26qza(conn)
     table.insert(waypointListConnections, conn)
     return conn
 end
 
-local function _vuzgqxj1()
+local function _wnojjeqv()
     for _, conn in ipairs(waypointListConnections) do
         if conn and conn.Connected then
             conn:Disconnect()
@@ -90,8 +90,8 @@ local function _vuzgqxj1()
     waypointListConnections = {}
 end
 
-local function _88y58lcn()
-    _vuzgqxj1()
+local function _xvycjwth()
+    _wnojjeqv()
     for _, conn in ipairs(allConnections) do
         if conn and conn.Connected then
             conn:Disconnect()
@@ -100,7 +100,7 @@ local function _88y58lcn()
     allConnections = {}
 end
 
-local function _cfuisxds()
+local function _viwt6apr()
     local char = player.Character
     if not char then return nil end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -109,7 +109,7 @@ local function _cfuisxds()
     return char, hrp, hum
 end
 
-local function _e9mip1i2()
+local function _9h6ug4b5()
     local cps = {}
     local seen = {}
     local workspace = game:GetService("Workspace")
@@ -166,8 +166,8 @@ local function _e9mip1i2()
     return cps
 end
 
-local function _sysqem8f(targetPos, offsetY)
-    local char, hrp, hum = _cfuisxds()
+local function _27y9opd7(targetPos, offsetY)
+    local char, hrp, hum = _viwt6apr()
     if not char or not hrp then return false end
     
     offsetY = offsetY or 3
@@ -195,7 +195,7 @@ local function _sysqem8f(targetPos, offsetY)
     return true
 end
 
-local function _6d5208mo(cp)
+local function _f3sk5j30(cp)
     if not cp or not cp.Parent then return false end
     
     local targetPos
@@ -212,17 +212,17 @@ local function _6d5208mo(cp)
         targetPos = cp.Position
     end
     
-    return _sysqem8f(targetPos)
+    return _27y9opd7(targetPos)
 end
 
-local function _gvhwi8km(text, color)
+local function _6yjc0wxc(text, color)
     if UI.StatusLabel then
         UI.StatusLabel.Text = text
         UI.StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
     end
 end
 
-local function _9o23w3v4(current, total)
+local function _3evf18iv(current, total)
     if UI.ProgressLabel then
         UI.ProgressLabel.Text = string.format("Progress: %d/%d", current, total)
     end
@@ -232,7 +232,7 @@ local function _9o23w3v4(current, total)
     end
 end
 
-local function _lxukdnn5(name, pos, rot)
+local function _jgikj49r(name, pos, rot)
     local waypoint = {
         name = name or string.format("Waypoint %d", #state.waypoints + 1),
         pos = pos,
@@ -243,113 +243,103 @@ local function _lxukdnn5(name, pos, rot)
     return waypoint
 end
 
-local function _fzqkrrjz()
-    local char, hrp, hum = _cfuisxds()
+local function _8l1jn5x1()
+    local char, hrp, hum = _viwt6apr()
     if not char or not hrp then
-        _gvhwi8km("❌ No character", Color3.fromRGB(255, 100, 100))
+        _6yjc0wxc("❌ No character", Color3.fromRGB(255, 100, 100))
         return nil
     end
     
     local cam = workspace.CurrentCamera
-    local wp = _lxukdnn5(
+    local wp = _jgikj49r(
         string.format("WP_%d", #state.waypoints + 1),
         hrp.Position,
         cam and cam.CFrame or hrp.CFrame
     )
     
-    _gvhwi8km(string.format("✅ Marked: %s", wp.name), Color3.fromRGB(80, 255, 120))
+    _6yjc0wxc(string.format("✅ Marked: %s", wp.name), Color3.fromRGB(80, 255, 120))
     return wp
 end
 
-local function _6jwuvp57(index)
+local function _jzqayyff(index)
     if index > 0 and index <= #state.waypoints then
         local wp = state.waypoints[index]
         table.remove(state.waypoints, index)
-        _gvhwi8km(string.format("🗑 Deleted: %s", wp.name), Color3.fromRGB(200, 100, 100))
+        _6yjc0wxc(string.format("🗑 Deleted: %s", wp.name), Color3.fromRGB(200, 100, 100))
         return true
     end
     return false
 end
 
-local function _nu1cqu43()
-    if #state.waypoints == 0 then
-        _gvhwi8km("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
+local function _ufg5sa0o()
+    if not listfiles or not readfile then
+        _6yjc0wxc("❌ File functions unavailable", Color3.fromRGB(255, 100, 100))
         return false
     end
     
-    local data = {
-        version = "3.3",
-        waypoints = {},
-        savedAt = os.time(),
-        mapName = workspace.Name or "Unknown",
-    }
-    
-    for _, wp in ipairs(state.waypoints) do
-        table.insert(data.waypoints, {
-            name = wp.name,
-            pos = {wp.pos.X, wp.pos.Y, wp.pos.Z},
-            rot = wp.rot and {
-                wp.rot:GetComponents()
-            } or nil,
-            timestamp = wp.timestamp,
-        })
+    local files = _ed33txt7()
+    if #files == 0 then
+        _6yjc0wxc("⚠ No files to merge", Color3.fromRGB(255, 200, 50))
+        return false
     end
     
-    local json = HttpService:JSONEncode(data)
+    local mergedWaypoints = {}
+    local seenPositions = {}
+    local totalLoaded = 0
     
-    if setclipboard then
-        pcall(function()
-            setclipboard(json)
-            _gvhwi8km(string.format("📤 Copied: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    for _, filename in ipairs(files) do
+        local path = "affan_waypoints_" .. filename .. ".json"
+        local success, json = pcall(function()
+            return readfile(path)
         end)
-    else
-        _gvhwi8km("❌ Clipboard unavailable", Color3.fromRGB(255, 100, 100))
+        
+        if success and json then
+            local ok, data = pcall(function()
+                return HttpService:JSONDecode(json)
+            end)
+            
+            if ok and data.waypoints then
+                for _, wp in ipairs(data.waypoints) do
+                    local posKey = string.format("%.1f_%.1f_%.1f", wp.pos[1], wp.pos[2], wp.pos[3])
+                    if not seenPositions[posKey] then
+                        table.insert(mergedWaypoints, wp)
+                        seenPositions[posKey] = true
+                        totalLoaded = totalLoaded + 1
+                    end
+                end
+            end
+        end
     end
     
-    return json
-end
-
-local function _9gy2bsue()
-    if not getclipboard then
-        _gvhwi8km("❌ Clipboard unavailable", Color3.fromRGB(255, 100, 100))
-        return false
-    end
-    
-    local success, json = pcall(function()
-        return getclipboard()
-    end)
-    
-    if not success or not json or json == "" then
-        _gvhwi8km("❌ Clipboard empty", Color3.fromRGB(255, 100, 100))
-        return false
-    end
-    
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(json)
-    end)
-    
-    if not ok or not data.waypoints then
-        _gvhwi8km("❌ Invalid format", Color3.fromRGB(255, 100, 100))
+    if totalLoaded == 0 then
+        _6yjc0wxc("❌ No waypoints found", Color3.fromRGB(255, 100, 100))
         return false
     end
     
     state.waypoints = {}
-    for _, wp in ipairs(data.waypoints or {}) do
+    for _, wp in ipairs(mergedWaypoints) do
         local pos = Vector3.new(wp.pos[1], wp.pos[2], wp.pos[3])
         local rot = nil
         if wp.rot and #wp.rot == 12 then
             rot = CFrame.new(unpack(wp.rot))
         end
-        _lxukdnn5(wp.name, pos, rot)
+        _jgikj49r(wp.name, pos, rot)
     end
     
-    _gvhwi8km(string.format("📥 Imported: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    local mergedFilename = "merged_" .. os.date("%m%d_%H%M")
+    _0s671vs6(mergedFilename)
+    
+    _6yjc0wxc(string.format("✅ Merged: %d files → %d waypoints", #files, totalLoaded), Color3.fromRGB(80, 255, 120))
+    if UI.FileLabel then
+        UI.FileLabel.Text = mergedFilename
+    end
+    
     return true
 end
 
-local function _irf3uoii(filename)
+local function _0s671vs6(filename)
     if not writefile then
-        _gvhwi8km("❌ writefile unavailable", Color3.fromRGB(255, 100, 100))
+        _6yjc0wxc("❌ writefile unavailable", Color3.fromRGB(255, 100, 100))
         return false
     end
     
@@ -378,13 +368,13 @@ local function _irf3uoii(filename)
         writefile(path, json)
     end)
     
-    _gvhwi8km(string.format("💾 Saved: %s", filename), Color3.fromRGB(80, 255, 120))
+    _6yjc0wxc(string.format("💾 Saved: %s", filename), Color3.fromRGB(80, 255, 120))
     return true
 end
 
-local function _h0lspl7d(filename)
+local function _txd0v2ht(filename)
     if not readfile then
-        _gvhwi8km("❌ readfile unavailable", Color3.fromRGB(255, 100, 100))
+        _6yjc0wxc("❌ readfile unavailable", Color3.fromRGB(255, 100, 100))
         return false
     end
     
@@ -395,7 +385,7 @@ local function _h0lspl7d(filename)
     end)
     
     if not success then
-        _gvhwi8km("❌ File not found", Color3.fromRGB(255, 100, 100))
+        _6yjc0wxc("❌ File not found", Color3.fromRGB(255, 100, 100))
         return false
     end
     
@@ -408,14 +398,14 @@ local function _h0lspl7d(filename)
         if wp.rot and #wp.rot == 12 then
             rot = CFrame.new(unpack(wp.rot))
         end
-        _lxukdnn5(wp.name, pos, rot)
+        _jgikj49r(wp.name, pos, rot)
     end
     
-    _gvhwi8km(string.format("📂 Loaded: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
+    _6yjc0wxc(string.format("📂 Loaded: %d waypoints", #state.waypoints), Color3.fromRGB(80, 255, 120))
     return true
 end
 
-local function _113obtxo()
+local function _ed33txt7()
     if not listfiles then return {} end
     
     local files = {}
@@ -433,30 +423,30 @@ local function _113obtxo()
     return files
 end
 
-local function _zl0a6cou()
+local function _8mn4qnwd()
     if state.running then return end
     
     local items = state.currentMode == "checkpoint" and state.checkpoints or state.waypoints
     
     if #items == 0 then
-        _gvhwi8km("⚠ No items", Color3.fromRGB(255, 200, 50))
+        _6yjc0wxc("⚠ No items", Color3.fromRGB(255, 200, 50))
         return
     end
     
     state.running = true
     state.paused = false
     state.currentIndex = 1
-    _gvhwi8km("🚀 Teleporting...", Color3.fromRGB(80, 255, 120))
-    _9o23w3v4(0, #items)
+    _6yjc0wxc("🚀 Teleporting...", Color3.fromRGB(80, 255, 120))
+    _3evf18iv(0, #items)
     
     task.spawn(function()
         while state.running do
             if not state.paused then
-                local char, hrp, hum = _cfuisxds()
+                local char, hrp, hum = _viwt6apr()
                 if not char or not hrp or not hum then
                     state.running = false
                     state.paused = false
-                    _gvhwi8km("❌ Character invalid", Color3.fromRGB(255, 100, 100))
+                    _6yjc0wxc("❌ Character invalid", Color3.fromRGB(255, 100, 100))
                     if UI.StartBtn then
                         UI.StartBtn.Text = "▶ START"
                         UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
@@ -468,28 +458,28 @@ local function _zl0a6cou()
                 local success = false
                 
                 if state.currentMode == "checkpoint" then
-                    success = _6d5208mo(item)
+                    success = _f3sk5j30(item)
                 else
                     if item and item.pos then
-                        success = _sysqem8f(item.pos)
+                        success = _27y9opd7(item.pos)
                     end
                 end
                 
                 if success then
-                    _9o23w3v4(state.currentIndex, #items)
+                    _3evf18iv(state.currentIndex, #items)
                     state.currentIndex = state.currentIndex + 1
                     
                     if state.currentIndex > #items then
                         if state.loopEnabled then
-                            _gvhwi8km("🔄 Loop restart", Color3.fromRGB(100, 150, 255))
+                            _6yjc0wxc("🔄 Loop restart", Color3.fromRGB(100, 150, 255))
                             state.currentIndex = 1
-                            _9o23w3v4(0, #items)
+                            _3evf18iv(0, #items)
                             task.wait(state.delayBetweenTP * 2)
                         else
                             state.running = false
                             state.paused = false
-                            _gvhwi8km("✅ Complete!", Color3.fromRGB(80, 255, 120))
-                            _9o23w3v4(#items, #items)
+                            _6yjc0wxc("✅ Complete!", Color3.fromRGB(80, 255, 120))
+                            _3evf18iv(#items, #items)
                             if UI.StartBtn then
                                 UI.StartBtn.Text = "▶ START"
                                 UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
@@ -502,7 +492,7 @@ local function _zl0a6cou()
                 else
                     state.running = false
                     state.paused = false
-                    _gvhwi8km("❌ TP failed", Color3.fromRGB(255, 100, 100))
+                    _6yjc0wxc("❌ TP failed", Color3.fromRGB(255, 100, 100))
                     if UI.StartBtn then
                         UI.StartBtn.Text = "▶ START"
                         UI.StartBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
@@ -516,10 +506,10 @@ local function _zl0a6cou()
     end)
 end
 
-local function _ad0v1g4w()
+local function _mukuvumu()
     state.running = false
     state.paused = false
-    _gvhwi8km("⏹ Stopped", Color3.fromRGB(150, 150, 150))
+    _6yjc0wxc("⏹ Stopped", Color3.fromRGB(150, 150, 150))
     
     if UI.StartBtn then
         UI.StartBtn.Text = "▶ START"
@@ -530,10 +520,10 @@ local function _ad0v1g4w()
     end
 end
 
-local function _paulgc2n()
+local function _c0cqw42h()
     if not UI.WaypointList then return end
     
-    _vuzgqxj1()
+    _wnojjeqv()
     
     for _, child in ipairs(UI.WaypointList:GetChildren()) do
         if child:IsA("Frame") then
@@ -580,9 +570,9 @@ local function _paulgc2n()
         TPBtnCorner.CornerRadius = UDim.new(0, 4)
         TPBtnCorner.Parent = TPBtn
         
-        _cs1tpzkj(TPBtn.MouseButton1Click:Connect(function()
-            _sysqem8f(wp.pos)
-            _gvhwi8km(string.format("🚀 TP: %s", wp.name), Color3.fromRGB(80, 255, 120))
+        _mrq26qza(TPBtn.MouseButton1Click:Connect(function()
+            _27y9opd7(wp.pos)
+            _6yjc0wxc(string.format("🚀 TP: %s", wp.name), Color3.fromRGB(80, 255, 120))
         end))
         
         local DelBtn = Instance.new("TextButton")
@@ -600,9 +590,9 @@ local function _paulgc2n()
         DelBtnCorner.CornerRadius = UDim.new(0, 4)
         DelBtnCorner.Parent = DelBtn
         
-        _cs1tpzkj(DelBtn.MouseButton1Click:Connect(function()
-            _6jwuvp57(i)
-            _paulgc2n()
+        _mrq26qza(DelBtn.MouseButton1Click:Connect(function()
+            _jzqayyff(i)
+            _c0cqw42h()
             if UI.WaypointListLabel then
                 UI.WaypointListLabel.Text = string.format("🎯 Waypoints (%d)", #state.waypoints)
             end
@@ -616,7 +606,7 @@ local function _paulgc2n()
     end
 end
 
-local function _kv25uvu5()
+local function _o1urao3c()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "AffanWaypointTP"
     ScreenGui.ResetOnSpawn = false
@@ -701,7 +691,7 @@ local function _kv25uvu5()
     CloseCorner.CornerRadius = UDim.new(0, 6)
     CloseCorner.Parent = CloseBtn
     
-    _hqpt2qw7(MinBtn.MouseButton1Click:Connect(function()
+    _hs0di3ib(MinBtn.MouseButton1Click:Connect(function()
         state.minimized = not state.minimized
         if state.minimized then
             Main.Size = UDim2.new(0, 200, 0, 32)
@@ -720,9 +710,9 @@ local function _kv25uvu5()
         end
     end))
     
-    _hqpt2qw7(CloseBtn.MouseButton1Click:Connect(function()
-        _ad0v1g4w()
-        _88y58lcn()
+    _hs0di3ib(CloseBtn.MouseButton1Click:Connect(function()
+        _mukuvumu()
+        _xvycjwth()
         ScreenGui:Destroy()
     end))
     
@@ -734,7 +724,7 @@ local function _kv25uvu5()
     LeftPanel.Parent = Main
     UI.LeftPanel = LeftPanel
     
-    local function _2xezak85(text, yPos, color, callback, parent)
+    local function _a4hkb2dm(text, yPos, color, callback, parent)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, 0, 0, 28)
         btn.Position = UDim2.new(0, 0, 0, yPos)
@@ -796,7 +786,7 @@ local function _kv25uvu5()
     ModeCorner.CornerRadius = UDim.new(0, 6)
     ModeCorner.Parent = ModeToggle
     
-    _hqpt2qw7(ModeToggle.MouseButton1Click:Connect(function()
+    _hs0di3ib(ModeToggle.MouseButton1Click:Connect(function()
         state.currentMode = state.currentMode == "checkpoint" and "waypoint" or "checkpoint"
         if state.currentMode == "checkpoint" then
             ModeToggle.Text = "📍 Checkpoint"
@@ -807,93 +797,59 @@ local function _kv25uvu5()
         end
     end))
     
-    _2xezak85("🔍 SCAN", 52, Color3.fromRGB(60, 120, 200), function()
-        state.checkpoints = _e9mip1i2()
+    _a4hkb2dm("🔍 SCAN", 52, Color3.fromRGB(60, 120, 200), function()
+        state.checkpoints = _9h6ug4b5()
         if #state.checkpoints > 0 then
-            _gvhwi8km(string.format("✅ %d CPs", #state.checkpoints), Color3.fromRGB(80, 255, 120))
-            _9o23w3v4(0, #state.checkpoints)
+            _6yjc0wxc(string.format("✅ %d CPs", #state.checkpoints), Color3.fromRGB(80, 255, 120))
+            _3evf18iv(0, #state.checkpoints)
         else
-            _gvhwi8km("⚠ No checkpoints", Color3.fromRGB(255, 200, 50))
+            _6yjc0wxc("⚠ No checkpoints", Color3.fromRGB(255, 200, 50))
         end
     end)
     
-    _2xezak85("📌 MARK", 85, Color3.fromRGB(180, 100, 200), function()
-        _fzqkrrjz()
-        _paulgc2n()
+    _a4hkb2dm("📌 MARK", 85, Color3.fromRGB(180, 100, 200), function()
+        _8l1jn5x1()
+        _c0cqw42h()
     end)
     
-    _2xezak85("💾 SAVE", 118, Color3.fromRGB(0, 150, 80), function()
+    _a4hkb2dm("💾 SAVE", 118, Color3.fromRGB(0, 150, 80), function()
         if #state.waypoints == 0 then
-            _gvhwi8km("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
+            _6yjc0wxc("⚠ No waypoints", Color3.fromRGB(255, 200, 50))
             return
         end
         local filename = "wp_" .. os.date("%m%d_%H%M")
-        _irf3uoii(filename)
+        _0s671vs6(filename)
         if UI.FileLabel then
             UI.FileLabel.Text = filename
         end
     end)
     
-    _2xezak85("📂 LOAD", 151, Color3.fromRGB(200, 140, 0), function()
-        local files = _113obtxo()
+    _a4hkb2dm("📂 LOAD", 151, Color3.fromRGB(200, 140, 0), function()
+        local files = _ed33txt7()
         if #files == 0 then
-            _gvhwi8km("⚠ No files", Color3.fromRGB(255, 200, 50))
+            _6yjc0wxc("⚠ No files", Color3.fromRGB(255, 200, 50))
             return
         end
         local filename = state.selectedFile or files[1]
-        if _h0lspl7d(filename) then
-            _paulgc2n()
+        if _txd0v2ht(filename) then
+            _c0cqw42h()
             if UI.FileLabel then
                 UI.FileLabel.Text = filename
             end
         end
     end)
     
-    local ExportBtn = Instance.new("TextButton")
-    ExportBtn.Size = UDim2.new(0.48, 0, 0, 28)
-    ExportBtn.Position = UDim2.new(0, 0, 0, 184)
-    ExportBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 200)
-    ExportBtn.BorderSizePixel = 0
-    ExportBtn.Text = "📤 EXPORT"
-    ExportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ExportBtn.Font = Enum.Font.GothamBold
-    ExportBtn.TextSize = 10
-    ExportBtn.Parent = LeftPanel
-    
-    local ExportBtnCorner = Instance.new("UICorner")
-    ExportBtnCorner.CornerRadius = UDim.new(0, 6)
-    ExportBtnCorner.Parent = ExportBtn
-    
-    _hqpt2qw7(ExportBtn.MouseButton1Click:Connect(function()
-        _nu1cqu43()
-    end))
-    
-    local ImportBtn = Instance.new("TextButton")
-    ImportBtn.Size = UDim2.new(0.48, 0, 0, 28)
-    ImportBtn.Position = UDim2.new(0.52, 0, 0, 184)
-    ImportBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 200)
-    ImportBtn.BorderSizePixel = 0
-    ImportBtn.Text = "📥 IMPORT"
-    ImportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ImportBtn.Font = Enum.Font.GothamBold
-    ImportBtn.TextSize = 10
-    ImportBtn.Parent = LeftPanel
-    
-    local ImportBtnCorner = Instance.new("UICorner")
-    ImportBtnCorner.CornerRadius = UDim.new(0, 6)
-    ImportBtnCorner.Parent = ImportBtn
-    
-    _hqpt2qw7(ImportBtn.MouseButton1Click:Connect(function()
-        if _9gy2bsue() then
-            _paulgc2n()
+    _a4hkb2dm("🔗 MERGE", 184, Color3.fromRGB(150, 100, 200), function()
+        if _ufg5sa0o() then
+            _c0cqw42h()
         end
-    end))
+    end)
     
-    local StartBtn = _2xezak85("▶ START", 217, Color3.fromRGB(0, 180, 80), function()
+    local StartBtn = _a4hkb2dm("▶ START", 217, Color3.fromRGB(0, 180, 80), function()
         if state.running then
-            _ad0v1g4w()
+            _mukuvumu()
         else
-            _zl0a6cou()
+            _8mn4qnwd()
             StartBtn.Text = "⏹ STOP"
             StartBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
         end
@@ -926,7 +882,7 @@ local function _kv25uvu5()
     LoopCorner.CornerRadius = UDim.new(0, 4)
     LoopCorner.Parent = LoopToggle
     
-    _hqpt2qw7(LoopToggle.MouseButton1Click:Connect(function()
+    _hs0di3ib(LoopToggle.MouseButton1Click:Connect(function()
         state.loopEnabled = not state.loopEnabled
         LoopToggle.Text = state.loopEnabled and "ON" or "OFF"
         LoopToggle.BackgroundColor3 = state.loopEnabled 
@@ -1055,7 +1011,7 @@ local function _kv25uvu5()
     
     local dragging = false
     
-    _hqpt2qw7(SliderBG.InputBegan:Connect(function(input)
+    _hs0di3ib(SliderBG.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -1063,7 +1019,7 @@ local function _kv25uvu5()
         end
     end))
     
-    _hqpt2qw7(UserInputService.InputEnded:Connect(function(input)
+    _hs0di3ib(UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
             if dragging then
@@ -1073,7 +1029,7 @@ local function _kv25uvu5()
         end
     end))
     
-    _hqpt2qw7(UserInputService.InputChanged:Connect(function(input)
+    _hs0di3ib(UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
                         input.UserInputType == Enum.UserInputType.Touch) then
             local pos = math.clamp(
@@ -1145,13 +1101,13 @@ local function _kv25uvu5()
     return ScreenGui
 end
 
-local gui = _kv25uvu5()
-_gvhwi8km("● Idle", Color3.fromRGB(150, 150, 150))
+local gui = _o1urao3c()
+_6yjc0wxc("● Idle", Color3.fromRGB(150, 150, 150))
 
-_hqpt2qw7(player.CharacterAdded:Connect(function()
-    _ad0v1g4w()
+_hs0di3ib(player.CharacterAdded:Connect(function()
+    _mukuvumu()
     task.wait(0.5)
-    _gvhwi8km("● Character respawned", Color3.fromRGB(200, 200, 80))
+    _6yjc0wxc("● Character respawned", Color3.fromRGB(200, 200, 80))
 end))
 
 pcall(function()
