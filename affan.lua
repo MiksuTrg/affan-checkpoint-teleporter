@@ -2,6 +2,56 @@
 -- Custom waypoint marking + save/load + auto teleport
 -- Bug fixes: 10 issues from v2.0
 
+--// =========================================================
+--// AFFAN Waypoint & Checkpoint Teleporter v3.0
+--// © 2026 MiksuTrg - All Rights Reserved
+--// Official: github.com/MiksuTrg/affan-checkpoint-teleporter
+--// =========================================================
+
+--// ANTI-COPY PROTECTION
+local AFFAN_SECURITY = {}
+AFFAN_SECURITY.VERSION = "3.0"
+AFFAN_SECURITY.BUILD = "20260723"
+AFFAN_SECURITY.SIGNATURE = "AFFAN_OFFICIAL_BUILD"
+
+local function verifyScript()
+    local HttpService = game:GetService("HttpService")
+    
+    -- Capture client ID for fingerprinting
+    local success, clientId = pcall(function()
+        return game:GetService("RbxAnalyticsService"):GetClientId()
+    end)
+    
+    if not success then
+        clientId = "UNKNOWN_CLIENT"
+    end
+    
+    -- Watermark verification
+    local watermark = string.format("%s_%s_%s", 
+        AFFAN_SECURITY.SIGNATURE, 
+        AFFAN_SECURITY.VERSION, 
+        AFFAN_SECURITY.BUILD)
+    
+    -- Source verification - only allow official GitHub raw or local execution
+    local sourceInfo = debug.info(1, "s")
+    if sourceInfo and sourceInfo ~= "[C]" and sourceInfo ~= "" then
+        if not sourceInfo:find("affan%-checkpoint%-teleporter") and not sourceInfo:find("MiksuTrg") then
+            -- Silent fail for unauthorized copies
+            return false
+        end
+    end
+    
+    return true
+end
+
+-- Initialize protection
+local AFFAN_AUTHORIZED = verifyScript()
+if not AFFAN_AUTHORIZED then
+    -- Silent exit - unauthorized copy won't show errors
+    return
+end
+
+--// MAIN SCRIPT STARTS HERE
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
